@@ -1,0 +1,9 @@
+Genera todas los archivos necesarios para buenas practicas
+php artisan make:scaffold Example
+
+luego se debe ejecutar la migracion si esta todo revizado.
+php artisan migrate
+
+si algo no esta como debe ejecutar
+php artisan migrate:rollback
+y luego borrar los archivos generados por el scaffold

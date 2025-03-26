@@ -1,0 +1,44 @@
+version: "3.8"
+
+services:
+  app:
+    build: .
+    container_name: laravel_app
+    environment:
+      APP_ENV: ${APP_ENV}
+      APP_KEY: ${APP_KEY}
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "9000:9000"
+    #   - .:/var/www/html
+    networks:
+      - laravel_net
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:15
+    container_name: laravel_postgres
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - laravel_net
+
+networks:
+  laravel_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+

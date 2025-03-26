@@ -1,0 +1,102 @@
+{
+    "clientName": "Thunder Client",
+    "collectionName": "to-do",
+    "collectionId": "a8bcf1e5-4f59-43bb-b5ad-3a82d89aa71f",
+    "dateExported": "2025-02-23T02:05:41.542Z",
+    "version": "1.2",
+    "folders": [],
+    "requests": [
+        {
+            "_id": "9e55ebcc-666f-40f2-8ef0-4f0c20619939",
+            "colId": "a8bcf1e5-4f59-43bb-b5ad-3a82d89aa71f",
+            "containerId": "",
+            "name": "http://127.0.0.1:8000/api/tasks",
+            "url": "http://127.0.0.1:8000/api/tasks",
+            "method": "GET",
+            "sortNum": 10000,
+            "created": "2025-02-22T23:01:45.428Z",
+            "modified": "2025-02-22T23:01:45.428Z",
+            "headers": []
+        },
+        {
+            "_id": "2ba147bf-bd01-4046-92c3-7981bbd8c187",
+            "colId": "a8bcf1e5-4f59-43bb-b5ad-3a82d89aa71f",
+            "containerId": "",
+            "name": "http://127.0.0.1:8000/api/tasks",
+            "url": "http://127.0.0.1:8000/api/tasks",
+            "method": "POST",
+            "sortNum": 20000,
+            "created": "2025-02-22T23:02:29.244Z",
+            "modified": "2025-02-22T23:07:23.995Z",
+            "headers": [],
+            "params": [
+                {
+                    "name": "title",
+                    "value": "test",
+                    "isDisabled": true,
+                    "isPath": false
+                }
+            ],
+            "body": {
+                "type": "formdata",
+                "raw": "",
+                "form": [
+                    {
+                        "name": "title",
+                        "value": "otro"
+                    }
+                ]
+            }
+        },
+        {
+            "_id": "2fe016c4-3871-4845-b748-589dab7eef36",
+            "colId": "a8bcf1e5-4f59-43bb-b5ad-3a82d89aa71f",
+            "containerId": "",
+            "name": "http://127.0.0.1:8000/api/tasks/{id}",
+            "url": "http://127.0.0.1:8000/api/tasks/2",
+            "method": "DELETE",
+            "sortNum": 20000,
+            "created": "2025-02-22T23:07:58.481Z",
+            "modified": "2025-02-22T23:10:58.931Z",
+            "headers": []
+        },
+        {
+            "_id": "002f3909-2d39-4bea-b5f0-6784060cc6d1",
+            "colId": "a8bcf1e5-4f59-43bb-b5ad-3a82d89aa71f",
+            "containerId": "",
+            "name": "http://127.0.0.1:8000/api/tasks/{id}",
+            "url": "http://127.0.0.1:8000/api/tasks/2",
+            "method": "PUT",
+            "sortNum": 30000,
+            "created": "2025-02-22T23:08:40.896Z",
+            "modified": "2025-02-22T23:09:53.301Z",
+            "headers": [],
+            "params": [
+                {
+                    "name": "title",
+                    "value": "actualizado",
+                    "isDisabled": true,
+                    "isPath": false
+                }
+            ],
+            "body": {
+                "type": "json",
+                "raw": "{\n  \"title\": \"actualizado\"\n}",
+                "form": []
+            }
+        },
+        {
+            "_id": "6a1f608b-7f4d-40f4-a79f-d638d399084a",
+            "colId": "a8bcf1e5-4f59-43bb-b5ad-3a82d89aa71f",
+            "containerId": "",
+            "name": "http://127.0.0.1:8000/api/tasks/{id}",
+            "url": "http://127.0.0.1:8000/api/tasks/2",
+            "method": "GET",
+            "sortNum": 30000,
+            "created": "2025-02-22T23:10:27.991Z",
+            "modified": "2025-02-22T23:11:25.641Z",
+            "headers": []
+        }
+    ],
+    "ref": "d4DKKpZbNZX9syPje9AgOm6RaPXVIO8AERzzYxO7WCJSerF1PHmi62ZylF-mBZxjpbSj2e9ueVM7xAGumJomhA"
+}
