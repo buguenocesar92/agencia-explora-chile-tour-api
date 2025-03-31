@@ -27,12 +27,7 @@ class StoreReservationRequest extends FormRequest
             'trip.destination' => 'required|string',
             'trip.departure_date' => 'required|date',
             'trip.return_date' => 'required|date',
-            'trip.service_type' => 'required|string',
 
-            'payment' => 'required|array',
-            'payment.amount' => 'required|numeric',
-            'payment.transaction_id' => 'required|string',
-            // El comprobante es opcional, pero si se envía, debe ser un archivo de imagen
             'payment.receipt' => 'nullable|file|mimes:jpeg,jpg,png,bmp|max:2048',
         ];
     }

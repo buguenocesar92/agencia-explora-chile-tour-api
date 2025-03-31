@@ -10,7 +10,6 @@ class Trip extends Model
         'destination',
         'departure_date',
         'return_date',
-        'service_type'
     ];
 
     public function reservations()

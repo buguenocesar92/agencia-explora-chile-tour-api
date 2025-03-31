@@ -8,9 +8,6 @@ use Illuminate\Support\Facades\Storage;
 class Payment extends Model
 {
     protected $fillable = [
-        'amount',
-        'payment_date',
-        'transaction_id',
         'receipt'
     ];
 

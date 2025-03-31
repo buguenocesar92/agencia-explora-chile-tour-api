@@ -73,4 +73,54 @@ class ReservationService
     {
         return $this->reservationRepo->updateStatus($id, $status);
     }
+
+    public function getReservation(int $id)
+    {
+        return $this->reservationRepo->getById($id);
+    }
+
+    public function updateReservation(int $id, array $data)
+    {
+        return DB::transaction(function () use ($id, $data) {
+            // Obtener la reserva con sus relaciones
+            $reservation = $this->reservationRepo->getById($id);
+
+            // Actualizar campos propios de la reserva
+            if (isset($data['description'])) {
+                $reservation->description = $data['description'];
+            }
+            if (isset($data['status'])) {
+                $reservation->status = $data['status'];
+            }
+            if (isset($data['date'])) {
+                $reservation->date = $data['date'];
+            }
+            $reservation->save();
+
+            // Actualizar el cliente
+            if (isset($data['client'])) {
+                $reservation->client->update($data['client']);
+            }
+
+            // Actualizar el viaje
+            if (isset($data['trip'])) {
+                $reservation->trip->update($data['trip']);
+            }
+
+            // Actualizar el pago
+            if (isset($data['payment'])) {
+                // Si se envía un nuevo comprobante (archivo), procesarlo
+                if (
+                    isset($data['payment']['receipt']) &&
+                    $data['payment']['receipt'] instanceof UploadedFile
+                ) {
+                    $path = $data['payment']['receipt']->store('payments', 'public');
+                    $data['payment']['receipt'] = $path;
+                }
+                $reservation->payment->update($data['payment']);
+            }
+
+            return $reservation;
+        });
+    }
 }

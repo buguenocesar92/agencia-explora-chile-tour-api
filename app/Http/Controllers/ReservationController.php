@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Reservation\StoreReservationRequest;
 use App\Http\Requests\Reservation\UpdateReservationRequest;
+use App\Http\Requests\Reservation\UpdateReservationStatusRequest;
 use App\Services\ReservationService;
 use Illuminate\Http\JsonResponse;
 
@@ -33,7 +34,7 @@ class ReservationController extends Controller
         ]);
     }
     // Endpoint para actualizar el status de una reserva
-    public function update(UpdateReservationRequest $request, int $id): JsonResponse
+    public function updateStatus(UpdateReservationStatusRequest $request, int $id): JsonResponse
     {
         $status = $request->input('status', 'paid'); // Por defecto a "paid" si se desea.
         $reservation = $this->reservationService->updateReservationStatus($id, $status);
@@ -44,4 +45,22 @@ class ReservationController extends Controller
         ]);
     }
 
+    public function show(int $id): JsonResponse
+    {
+        $reservation = $this->reservationService->getReservation($id);
+        return response()->json([
+            'reservation' => $reservation,
+        ]);
+    }
+
+    public function update(UpdateReservationRequest $request, int $id): JsonResponse
+    {
+        // Se asume que el request contiene todos los campos de la reserva y sus relaciones
+        $reservation = $this->reservationService->updateReservation($id, $request->all());
+
+        return response()->json([
+            'message'     => 'Reserva actualizada correctamente',
+            'reservation' => $reservation,
+        ]);
+    }
 }

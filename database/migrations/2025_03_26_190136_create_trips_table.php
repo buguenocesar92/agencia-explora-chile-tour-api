@@ -16,7 +16,6 @@ return new class extends Migration
             $table->string('destination');
             $table->date('departure_date');
             $table->date('return_date');
-            $table->string('service_type');
             $table->timestamps();
         });
     }

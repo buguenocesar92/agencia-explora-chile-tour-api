@@ -26,4 +26,9 @@ class ReservationRepository implements ReservationRepositoryInterface
 
         return $reservation;
     }
+
+    public function getById(int $id)
+    {
+        return Reservation::with(['client', 'trip', 'payment'])->findOrFail($id);
+    }
 }
