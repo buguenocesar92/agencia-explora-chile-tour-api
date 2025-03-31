@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class Payment extends Model
 {
@@ -13,8 +14,13 @@ class Payment extends Model
         'receipt'
     ];
 
-    public function reservations()
+    // Agrega el accesor para que se incluya en el JSON
+    protected $appends = ['receipt_url'];
+
+    public function getReceiptUrlAttribute()
     {
-        return $this->hasMany(Reservation::class);
+        return $this->receipt
+            ? asset('storage/' . $this->receipt)
+            : null;
     }
 }

@@ -3,20 +3,17 @@
 namespace App\Services;
 
 use App\Repositories\UserRepository;
-use App\Repositories\ProfessionalRepository;
+
 use Illuminate\Support\Facades\Auth;
 
 class AuthService
 {
     protected UserRepository $userRepository;
-    protected ProfessionalRepository $professionalRepository;
 
     public function __construct(
         UserRepository $userRepository,
-        ProfessionalRepository $professionalRepository
     ) {
         $this->userRepository = $userRepository;
-        $this->professionalRepository = $professionalRepository;
     }
 
     /**

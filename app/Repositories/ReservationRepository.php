@@ -11,4 +11,19 @@ class ReservationRepository implements ReservationRepositoryInterface
     {
         return Reservation::create($data);
     }
+
+    public function getAll()
+    {
+        // Incluimos relaciones, si las tienes definidas en el modelo
+        return Reservation::with(['client', 'trip', 'payment'])->get();
+    }
+
+    public function updateStatus(int $id, string $status)
+    {
+        $reservation = Reservation::findOrFail($id);
+        $reservation->status = $status;
+        $reservation->save();
+
+        return $reservation;
+    }
 }
