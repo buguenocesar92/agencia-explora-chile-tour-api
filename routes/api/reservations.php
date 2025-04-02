@@ -9,4 +9,5 @@ Route::group(['prefix' => 'reservations'], function () {
     Route::get('/{id}', [ReservationController::class, 'show'])->name('reservations.show');
     Route::put('/{id}', [ReservationController::class, 'update'])->name('reservations.update');
     Route::put('/status/{id}', [ReservationController::class, 'updateStatus'])->name('reservations.updateStatus');
+    Route::delete('/{id}', [ReservationController::class, 'destroy'])->name('reservations.destroy');
 });

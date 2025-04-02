@@ -11,4 +11,5 @@ interface ReservationRepositoryInterface
 
     // Método para obtener una reserva por ID
     public function getById(int $id);
+    public function delete(int $id);
 }

@@ -63,4 +63,12 @@ class ReservationController extends Controller
             'reservation' => $reservation,
         ]);
     }
+
+    public function destroy(int $id): JsonResponse
+    {
+        $this->reservationService->deleteReservation($id);
+        return response()->json([
+            'message' => 'Reserva eliminada correctamente',
+        ]);
+    }
 }

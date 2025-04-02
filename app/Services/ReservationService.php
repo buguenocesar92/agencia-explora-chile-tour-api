@@ -123,4 +123,20 @@ class ReservationService
             return $reservation;
         });
     }
+
+    public function deleteReservation(int $id)
+    {
+        return DB::transaction(function () use ($id) {
+            // Obtener la reserva con sus relaciones
+            $reservation = $this->reservationRepo->getById($id);
+
+            // Eliminar el comprobante de pago si existe
+            if ($reservation->payment && $reservation->payment->receipt) {
+                Storage::disk('public')->delete($reservation->payment->receipt);
+            }
+
+            // Eliminar la reserva
+            return $this->reservationRepo->delete($id);
+        });
+    }
 }

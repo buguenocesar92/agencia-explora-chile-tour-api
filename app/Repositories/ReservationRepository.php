@@ -31,4 +31,11 @@ class ReservationRepository implements ReservationRepositoryInterface
     {
         return Reservation::with(['client', 'trip', 'payment'])->findOrFail($id);
     }
+
+    public function delete(int $id)
+    {
+        $reservation = Reservation::findOrFail($id);
+        $reservation->delete();
+        return $reservation;
+    }
 }
