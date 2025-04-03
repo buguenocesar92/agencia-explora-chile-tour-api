@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('trips', function (Blueprint $table) {
             $table->id();
-            $table->string('destination');
+            $table->string('destination')->nullable();
             $table->date('departure_date');
             $table->date('return_date');
             $table->timestamps();
