@@ -24,9 +24,9 @@ class StoreReservationRequest extends FormRequest
             'client.phone' => 'required|string',
 
             'trip' => 'required|array',
-            'trip.destination' => 'required|string',
+/*             'trip.destination' => 'required|string',
             'trip.departure_date' => 'required|date',
-            'trip.return_date' => 'required|date',
+            'trip.return_date' => 'required|date', */
 
             'payment.receipt' => 'nullable|file|mimes:jpeg,jpg,png,bmp|max:2048',
         ];

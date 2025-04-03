@@ -10,8 +10,8 @@ class Trip extends Model
         'tour_template_id',
         'departure_date',
         'return_date',
-        'price',
-        'capacity'
+/*         'price',
+        'capacity' */
     ];
 
     public function tourTemplate()
