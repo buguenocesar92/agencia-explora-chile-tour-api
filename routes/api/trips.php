@@ -5,7 +5,7 @@ use App\Http\Controllers\TripController;
 
 Route::group([
     'prefix' => 'trips',
-/*     'middleware' => ['auth:api', 'check_route_permission'], */
+    'middleware' => ['auth:api', 'check_route_permission'],
 ], function () {
     Route::get('/', [TripController::class, 'index']);
     Route::post('/', [TripController::class, 'store']);
