@@ -7,6 +7,9 @@ use App\Http\Requests\Reservation\UpdateReservationRequest;
 use App\Http\Requests\Reservation\UpdateReservationStatusRequest;
 use App\Services\ReservationService;
 use Illuminate\Http\JsonResponse;
+use App\Mail\ConfirmacionReserva;
+use Illuminate\Support\Facades\Mail;
+
 
 class ReservationController extends Controller
 {
@@ -34,16 +37,38 @@ class ReservationController extends Controller
         ]);
     }
     // Endpoint para actualizar el status de una reserva
+
+
     public function updateStatus(UpdateReservationStatusRequest $request, int $id): JsonResponse
     {
-        $status = $request->input('status', 'paid'); // Por defecto a "paid" si se desea.
+        $status = $request->input('status', 'paid');
         $reservation = $this->reservationService->updateReservationStatus($id, $status);
+
+        // Cargar relaciones necesarias: client, trip, y tourTemplate
+        $reservation->load('client', 'trip.tourTemplate');
+
+        if (
+            $status === 'paid' &&
+            $reservation->client &&
+            $reservation->trip &&
+            $reservation->trip->tourTemplate
+        ) {
+            $datos = [
+                'nombre'  => $reservation->client->name,                          // Asegúrate de tener este campo
+                'destino' => $reservation->trip->tourTemplate->name ?? 'N/A',
+                'fecha'   => $reservation->trip->departure_date ?? $reservation->date,
+            ];
+
+            Mail::to($reservation->client->email)->send(new ConfirmacionReserva($datos));
+        }
 
         return response()->json([
             'message'     => 'Reserva actualizada correctamente',
             'reservation' => $reservation,
         ]);
     }
+
+
 
     public function show(int $id): JsonResponse
     {
