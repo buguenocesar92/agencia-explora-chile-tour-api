@@ -14,7 +14,9 @@ class ReservationRepository implements ReservationRepositoryInterface
 
     public function getAll()
     {
-        return Reservation::with(['client', 'trip.tourTemplate', 'payment'])->get();
+        return Reservation::with(['client', 'trip.tourTemplate', 'payment'])
+            ->orderBy('created_at', 'desc')
+            ->get();
     }
 
 
