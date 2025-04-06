@@ -17,8 +17,8 @@ class ReservationRepository implements ReservationRepositoryInterface
         return Reservation::with(['client', 'trip.tourTemplate', 'payment'])
             ->when($search, function ($query) use ($search) {
                 $query->whereHas('client', function ($q) use ($search) {
-                    $q->where('name', 'like', "%$search%")
-                      ->orWhere('rut', 'like', "%$search%");
+                    $q->where('name', 'ilike', "%$search%")
+                      ->orWhere('rut', 'ilike', "%$search%");
                 });
             })
             ->orderBy('created_at', 'desc')
