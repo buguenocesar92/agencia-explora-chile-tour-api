@@ -12,9 +12,15 @@ class ReservationRepository implements ReservationRepositoryInterface
         return Reservation::create($data);
     }
 
-    public function getAll()
+    public function getAll(?string $search = null)
     {
         return Reservation::with(['client', 'trip.tourTemplate', 'payment'])
+            ->when($search, function ($query) use ($search) {
+                $query->whereHas('client', function ($q) use ($search) {
+                    $q->where('name', 'like', "%$search%")
+                      ->orWhere('rut', 'like', "%$search%");
+                });
+            })
             ->orderBy('created_at', 'desc')
             ->get();
     }

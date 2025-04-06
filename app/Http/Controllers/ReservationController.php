@@ -9,6 +9,7 @@ use App\Services\ReservationService;
 use Illuminate\Http\JsonResponse;
 use App\Mail\ConfirmacionReserva;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Http\Request;
 
 
 class ReservationController extends Controller
@@ -20,6 +21,16 @@ class ReservationController extends Controller
         $this->reservationService = $reservationService;
     }
 
+    public function index(Request $request): JsonResponse
+    {
+        $search = $request->input('search');
+        $reservations = $this->reservationService->listReservations($search);
+
+        return response()->json([
+            'reservations' => $reservations,
+        ]);
+    }
+
     public function store(StoreReservationRequest $request): JsonResponse
     {
         $reservation = $this->reservationService->createReservation($request->all());
@@ -28,16 +39,6 @@ class ReservationController extends Controller
             'reservation' => $reservation,
         ], 201);
     }
-
-    public function index(): JsonResponse
-    {
-        $reservations = $this->reservationService->listReservations();
-        return response()->json([
-            'reservations' => $reservations,
-        ]);
-    }
-    // Endpoint para actualizar el status de una reserva
-
 
     public function updateStatus(UpdateReservationStatusRequest $request, int $id): JsonResponse
     {

@@ -57,9 +57,9 @@ class ReservationService
     }
 
 
-    public function listReservations()
+    public function listReservations(?string $search = null)
     {
-        return $this->reservationRepo->getAll();
+        return $this->reservationRepo->getAll($search);
     }
 
     // Método para actualizar el status de una reserva
