@@ -9,3 +9,4 @@ require __DIR__ . '/api/reservations.php';
 require __DIR__ . '/api/tours.php';
 require __DIR__ . '/api/tour-templates.php';
 require __DIR__ . '/api/trips.php';
+require __DIR__ . '/api/clients.php';
