@@ -6,6 +6,7 @@ use App\Http\Requests\Client\StoreClientRequest;
 use App\Http\Requests\Client\UpdateClientRequest;
 use App\Services\ClientService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class ClientController extends Controller
 {
@@ -16,9 +17,10 @@ class ClientController extends Controller
         $this->clientService = $clientService;
     }
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $clients = $this->clientService->getAll();
+        $search = $request->input('search');
+        $clients = $this->clientService->getAll($search);
         return response()->json($clients);
     }
 

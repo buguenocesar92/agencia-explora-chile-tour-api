@@ -7,9 +7,14 @@ use App\Repositories\Contracts\ClientRepositoryInterface;
 
 class ClientRepository implements ClientRepositoryInterface
 {
-    public function getAll()
+    public function getAll(?string $search = null)
     {
-        return Client::all();
+        return Client::when($search, function ($query) use ($search) {
+                $query->where('name', 'ilike', "%$search%")
+                      ->orWhere('rut', 'ilike', "%$search%");
+            })
+            ->orderBy('name')
+            ->get();
     }
 
     public function findById(int $id)

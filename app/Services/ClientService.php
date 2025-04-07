@@ -13,9 +13,9 @@ class ClientService
         $this->clientRepo = $clientRepo;
     }
 
-    public function getAll()
+    public function getAll(?string $search = null)
     {
-        return $this->clientRepo->getAll();
+        return $this->clientRepo->getAll($search);
     }
 
     public function findById(int $id)
