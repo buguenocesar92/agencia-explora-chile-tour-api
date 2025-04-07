@@ -22,8 +22,16 @@ class ReservationService
     public function createReservation(array $data)
     {
         return DB::transaction(function () use ($data) {
-            // Crear el cliente
-            $client = Client::create($data['client']);
+            // Buscar si ya existe un cliente con este RUT
+            $client = Client::where('rut', $data['client']['rut'])->first();
+
+            if (!$client) {
+                // Si no existe, crear un nuevo cliente
+                $client = Client::create($data['client']);
+            } else {
+                // Si ya existe, actualizar sus datos por si han cambiado
+                $client->update($data['client']);
+            }
 
             // Obtener el viaje programado existente usando el ID que envía el wizard
             $trip = Trip::findOrFail($data['trip']['trip_date_id']);
