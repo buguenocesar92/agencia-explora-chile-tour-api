@@ -45,7 +45,10 @@ class ReservationService
                 isset($data['payment']['receipt']) &&
                 $data['payment']['receipt'] instanceof UploadedFile
             ) {
-                $path = $data['payment']['receipt']->store('payments', 'public');
+                $path = $data['payment']['receipt']->store('payments', [
+                    'disk' => 's3',
+                    'visibility' => 'public'
+                ]);
                 $data['payment']['receipt'] = $path;
             }
 
@@ -116,7 +119,15 @@ class ReservationService
                     isset($data['payment']['receipt']) &&
                     $data['payment']['receipt'] instanceof UploadedFile
                 ) {
-                    $path = $data['payment']['receipt']->store('payments', 'public');
+                    // Eliminar el archivo anterior si existe
+                    if ($reservation->payment && $reservation->payment->receipt) {
+                        Storage::disk('s3')->delete($reservation->payment->receipt);
+                    }
+
+                    $path = $data['payment']['receipt']->store('payments', [
+                        'disk' => 's3',
+                        'visibility' => 'public'
+                    ]);
                     $data['payment']['receipt'] = $path;
                 }
                 $reservation->payment->update($data['payment']);
@@ -134,7 +145,7 @@ class ReservationService
 
             // Eliminar el comprobante de pago si existe
             if ($reservation->payment && $reservation->payment->receipt) {
-                Storage::disk('public')->delete($reservation->payment->receipt);
+                Storage::disk('s3')->delete($reservation->payment->receipt);
             }
 
             // Eliminar la reserva
