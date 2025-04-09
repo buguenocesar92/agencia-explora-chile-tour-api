@@ -4,7 +4,7 @@ return [
     'paths' => ['api/*', 'sanctum/csrf-cookie'],
     'allowed_methods' => ['*'],
     // Especifica el origen exacto de tu frontend
-    'allowed_origins' => ['https://explora-chile-tour.netlify.app'],
+    'allowed_origins' => ['http://localhost:3000','http://localhost:3001', 'http://localhost:5173', 'https://gilded-gelato-8c2ec1.netlify.app', 'https://cbm3lla.me', 'https://explora-chile-tour.netlify.app'],
     'allowed_origins_patterns' => [],
     'allowed_headers' => ['*'],
     'exposed_headers' => [],
