@@ -17,8 +17,12 @@ class ReservationRepository implements ReservationRepositoryInterface
         return Reservation::with(['client', 'trip.tourTemplate', 'payment'])
             ->when($search, function ($query) use ($search) {
                 $query->whereHas('client', function ($q) use ($search) {
+                    // Limpiar el formato del RUT para comparación (quitar puntos y guiones)
+                    $cleanSearch = preg_replace('/[.-]/', '', $search);
+
                     $q->where('name', 'ilike', "%$search%")
-                      ->orWhere('rut', 'ilike', "%$search%");
+                      // Buscar coincidencia exacta de RUT limpio
+                      ->orWhereRaw("REPLACE(REPLACE(rut, '.', ''), '-', '') ILIKE ?", ["%$cleanSearch%"]);
                 });
             })
             ->orderBy('created_at', 'desc')
