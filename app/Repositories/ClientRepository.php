@@ -10,8 +10,12 @@ class ClientRepository implements ClientRepositoryInterface
     public function getAll(?string $search = null)
     {
         return Client::when($search, function ($query) use ($search) {
+                // Limpiar el formato del RUT para comparación (quitar puntos y guiones)
+                $cleanSearch = preg_replace('/[.-]/', '', $search);
+
                 $query->where('name', 'ilike', "%$search%")
-                      ->orWhere('rut', 'ilike', "%$search%");
+                      // Buscar coincidencia exacta de RUT limpio
+                      ->orWhereRaw("REPLACE(REPLACE(rut, '.', ''), '-', '') ILIKE ?", ["%$cleanSearch%"]);
             })
             ->orderBy('name')
             ->get();
