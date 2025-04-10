@@ -12,7 +12,7 @@ class ReservationRepository implements ReservationRepositoryInterface
         return Reservation::create($data);
     }
 
-    public function getAll(?string $search = null)
+    public function getAll(?string $search = null, array $filters = [])
     {
         return Reservation::with(['client', 'trip.tourTemplate', 'payment'])
             ->when($search, function ($query) use ($search) {
@@ -23,6 +23,11 @@ class ReservationRepository implements ReservationRepositoryInterface
                     $q->where('name', 'ilike', "%$search%")
                       // Buscar coincidencia exacta de RUT limpio
                       ->orWhereRaw("REPLACE(REPLACE(rut, '.', ''), '-', '') ILIKE ?", ["%$cleanSearch%"]);
+                });
+            })
+            ->when(isset($filters['tour_id']), function ($query) use ($filters) {
+                $query->whereHas('trip', function ($q) use ($filters) {
+                    $q->where('tour_template_id', $filters['tour_id']);
                 });
             })
             ->orderBy('created_at', 'desc')

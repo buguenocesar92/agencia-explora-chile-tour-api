@@ -24,7 +24,15 @@ class ReservationController extends Controller
     public function index(Request $request): JsonResponse
     {
         $search = $request->input('search');
-        $reservations = $this->reservationService->listReservations($search);
+        $tourId = $request->input('tour_id');
+
+        // Crear array de filtros
+        $filters = [];
+        if ($tourId) {
+            $filters['tour_id'] = $tourId;
+        }
+
+        $reservations = $this->reservationService->listReservations($search, $filters);
 
         return response()->json([
             'reservations' => $reservations,
