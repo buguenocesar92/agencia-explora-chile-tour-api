@@ -28,7 +28,7 @@ class StoreReservationRequest extends FormRequest
             'trip.departure_date' => 'required|date',
             'trip.return_date' => 'required|date', */
 
-            'payment.receipt' => 'nullable|file|mimes:jpeg,jpg,png,bmp|max:2048',
+            'payment.receipt' => 'nullable|file|mimes:jpeg,jpg,png,bmp,pdf|max:2048',
         ];
     }
 }

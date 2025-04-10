@@ -32,7 +32,7 @@ class UpdateReservationRequest extends FormRequest
             'trip.departure_date'  => 'required|date',
             'trip.return_date'     => 'required|date',
 
-            'payment.receipt'           => 'nullable|file|mimes:jpg,jpeg,png,pdf',
+            'payment.receipt' => 'nullable|file|mimes:jpg,jpeg,png,bmp,pdf|max:2048',
         ];
     }
 
