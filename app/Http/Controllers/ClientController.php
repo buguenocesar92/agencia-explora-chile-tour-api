@@ -53,4 +53,28 @@ class ClientController extends Controller
         $this->clientService->delete($id);
         return response()->json(['message' => 'Cliente eliminado con éxito.']);
     }
+
+    /**
+     * Busca un cliente por su RUT (endpoint público)
+     */
+    public function findByRut(Request $request): JsonResponse
+    {
+        $rut = $request->query('rut');
+
+        if (empty($rut)) {
+            return response()->json(['message' => 'El parámetro RUT es requerido'], 400);
+        }
+
+        // Normalizar el RUT (eliminar puntos y guiones)
+        $normalizedRut = preg_replace('/[.-]/', '', $rut);
+
+        // Buscar cliente por RUT normalizado
+        $client = $this->clientService->findByRut($normalizedRut);
+
+        if ($client) {
+            return response()->json($client);
+        }
+
+        return response()->json(null);
+    }
 }

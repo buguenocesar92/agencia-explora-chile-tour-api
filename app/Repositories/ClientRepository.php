@@ -43,4 +43,16 @@ class ClientRepository implements ClientRepositoryInterface
         $client = Client::findOrFail($id);
         $client->delete();
     }
+
+    /**
+     * Busca un cliente por su RUT normalizado (sin puntos ni guiones)
+     *
+     * @param string $normalizedRut
+     * @return \App\Models\Client|null
+     */
+    public function findByRut(string $normalizedRut)
+    {
+        return Client::whereRaw("REPLACE(REPLACE(rut, '.', ''), '-', '') = ?", [$normalizedRut])
+            ->first();
+    }
 }

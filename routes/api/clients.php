@@ -3,6 +3,9 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ClientController;
 
+// Ruta pública para buscar cliente por RUT - no requiere autenticación
+Route::get('/clients/search-by-rut', [ClientController::class, 'findByRut'])->name('clients.find-by-rut');
+
 Route::group([
     'prefix' => 'clients',
     'middleware' => ['auth:api', 'check_route_permission'],

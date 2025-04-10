@@ -10,10 +10,19 @@ class TripController extends Controller
     /**
      * Lista todos los trips.
      */
-    public function index()
+    public function index(Request $request)
     {
-        // Se incluye la relación con tourTemplate para mayor contexto
-        $trips = Trip::with('tourTemplate')->get();
+        // Iniciamos la consulta
+        $query = Trip::with('tourTemplate');
+
+        // Aplicamos filtros si están presentes en la petición
+        if ($request->has('tour_template_id')) {
+            $query->where('tour_template_id', $request->tour_template_id);
+        }
+
+        // Ejecutamos la consulta y obtenemos los resultados
+        $trips = $query->get();
+
         return response()->json([
             'trips' => $trips,
         ]);

@@ -37,4 +37,15 @@ class ClientService
     {
         $this->clientRepo->delete($id);
     }
+
+    /**
+     * Busca un cliente por su RUT normalizado
+     *
+     * @param string $normalizedRut RUT sin puntos ni guiones
+     * @return \App\Models\Client|null Cliente encontrado o null
+     */
+    public function findByRut(string $normalizedRut)
+    {
+        return $this->clientRepo->findByRut($normalizedRut);
+    }
 }
