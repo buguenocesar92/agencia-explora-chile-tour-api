@@ -26,6 +26,7 @@ class ReservationController extends Controller
         $search = $request->input('search');
         $tourId = $request->input('tour_id');
         $status = $request->input('status');
+        $date = $request->input('date');
 
         // Crear array de filtros
         $filters = [];
@@ -36,6 +37,11 @@ class ReservationController extends Controller
         // Agregar filtro de status si está presente
         if ($status) {
             $filters['status'] = $status;
+        }
+
+        // Agregar filtro de fecha si está presente
+        if ($date) {
+            $filters['date'] = $date;
         }
 
         $reservations = $this->reservationService->listReservations($search, $filters);

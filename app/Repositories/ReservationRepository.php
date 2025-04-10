@@ -33,6 +33,9 @@ class ReservationRepository implements ReservationRepositoryInterface
             ->when(isset($filters['status']), function ($query) use ($filters) {
                 $query->where('status', $filters['status']);
             })
+            ->when(isset($filters['date']), function ($query) use ($filters) {
+                $query->whereDate('date', $filters['date']);
+            })
             ->orderBy('created_at', 'desc')
             ->get();
     }
