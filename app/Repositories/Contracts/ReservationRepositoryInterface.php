@@ -5,7 +5,7 @@ namespace App\Repositories\Contracts;
 interface ReservationRepositoryInterface
 {
     public function create(array $data);
-    public function getAll();
+    public function getAll(?string $search = null, array $filters = []);
     // Método para actualizar el status de una reserva
     public function updateStatus(int $id, string $status);
 

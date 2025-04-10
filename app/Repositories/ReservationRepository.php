@@ -30,6 +30,9 @@ class ReservationRepository implements ReservationRepositoryInterface
                     $q->where('tour_template_id', $filters['tour_id']);
                 });
             })
+            ->when(isset($filters['status']), function ($query) use ($filters) {
+                $query->where('status', $filters['status']);
+            })
             ->orderBy('created_at', 'desc')
             ->get();
     }
