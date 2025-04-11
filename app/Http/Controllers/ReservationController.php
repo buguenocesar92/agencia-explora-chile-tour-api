@@ -9,16 +9,20 @@ use App\Services\ReservationService;
 use Illuminate\Http\JsonResponse;
 use App\Mail\ConfirmacionReserva;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
+use App\Services\WhatsAppService;
 
 
 class ReservationController extends Controller
 {
     private ReservationService $reservationService;
+    private WhatsAppService $whatsAppService;
 
-    public function __construct(ReservationService $reservationService)
+    public function __construct(ReservationService $reservationService, WhatsAppService $whatsAppService)
     {
         $this->reservationService = $reservationService;
+        $this->whatsAppService = $whatsAppService;
     }
 
     public function index(Request $request): JsonResponse
@@ -63,24 +67,82 @@ class ReservationController extends Controller
     public function updateStatus(UpdateReservationStatusRequest $request, int $id): JsonResponse
     {
         $status = $request->input('status', 'paid');
+
+        // Añadir debug para ver los datos recibidos
+        Log::info('ReservationController::updateStatus - Iniciando actualización', [
+            'id' => $id,
+            'status' => $status
+        ]);
+
         $reservation = $this->reservationService->updateReservationStatus($id, $status);
 
         // Cargar relaciones necesarias: client, trip, y tourTemplate
         $reservation->load('client', 'trip.tourTemplate');
 
-        if (
-            $status === 'paid' &&
-            $reservation->client &&
-            $reservation->trip &&
-            $reservation->trip->tourTemplate
-        ) {
-            $datos = [
-                'nombre'  => $reservation->client->name,                          // Asegúrate de tener este campo
-                'destino' => $reservation->trip->tourTemplate->name ?? 'N/A',
-                'fecha'   => $reservation->trip->departure_date ?? $reservation->date,
-            ];
+        Log::info('ReservationController::updateStatus - Reserva cargada', [
+            'reservation_id' => $reservation->id,
+            'client' => $reservation->client ? true : false,
+            'trip' => $reservation->trip ? true : false,
+            'tourTemplate' => ($reservation->trip && $reservation->trip->tourTemplate) ? true : false,
+            'client_phone' => $reservation->client ? $reservation->client->phone : null
+        ]);
 
-            Mail::to($reservation->client->email)->send(new ConfirmacionReserva($datos));
+        // Si la reserva fue marcada como pagada, enviar notificaciones
+        if ($status === 'paid') {
+            // Verificar si tenemos los datos necesarios
+            if ($reservation->client) {
+                $datos = [
+                    'nombre'  => $reservation->client->name,
+                    'destino' => ($reservation->trip && $reservation->trip->tourTemplate)
+                               ? $reservation->trip->tourTemplate->name
+                               : 'N/A',
+                    'fecha'   => ($reservation->trip && $reservation->trip->departure_date)
+                              ? $reservation->trip->departure_date
+                              : $reservation->date,
+                ];
+
+                // 1. Enviar correo electrónico
+                if ($reservation->client->email) {
+                    Log::info('ReservationController::updateStatus - Enviando correo', [
+                        'email' => $reservation->client->email
+                    ]);
+
+                    try {
+                        Mail::to($reservation->client->email)->send(new ConfirmacionReserva($datos));
+                    } catch (\Exception $e) {
+                        Log::error('Error al enviar correo: ' . $e->getMessage());
+                    }
+                }
+
+                // 2. Enviar WhatsApp
+                if ($reservation->client->phone) {
+                    Log::info('ReservationController::updateStatus - Enviando WhatsApp', [
+                        'phone' => $reservation->client->phone
+                    ]);
+
+                    try {
+                        $whatsappResult = $this->whatsAppService->sendPaymentConfirmation(
+                            $reservation->client->phone,
+                            $datos
+                        );
+
+                        Log::info('ReservationController::updateStatus - Resultado WhatsApp', [
+                            'success' => $whatsappResult
+                        ]);
+                    } catch (\Exception $e) {
+                        Log::error('Error al enviar WhatsApp: ' . $e->getMessage(), [
+                            'exception' => get_class($e),
+                            'trace' => $e->getTraceAsString()
+                        ]);
+                    }
+                } else {
+                    Log::info('ReservationController::updateStatus - No se envía WhatsApp: sin teléfono');
+                }
+            } else {
+                Log::warning('ReservationController::updateStatus - No se encontró cliente para la reserva');
+            }
+        } else {
+            Log::info('ReservationController::updateStatus - No se envían notificaciones: estado no es "paid"');
         }
 
         return response()->json([
