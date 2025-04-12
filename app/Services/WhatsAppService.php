@@ -8,8 +8,21 @@ use Illuminate\Support\Facades\Log;
 class WhatsAppService
 {
     // Configuración para WhatsApp Business API
-    private $phoneNumberId = '622368397626491';
-    private $token = 'EAAz2avvOZAHsBO3A3XDLSLp7yGphsqZC9nrFyTgwrDnYYXXVul8xRROS0txSVnvZA86HVfsRdFqaKKH2PqWV9n73KhcCaGoOmkGk6uFyMPOjIYzBg2Ww6n3dpd1s6GiHSRERDZAKpEbhgcPEAtSq7aXOW39exx9WEcVZCcAqF331qeQ4MjalI3RZAkXkpFdbpBxYKPe1pbMkxssU9glF70t3XlSKbckhB8i38ZD';
+    private $phoneNumberId;
+    private $token;
+
+    public function __construct()
+    {
+        // Obtener configuración de las variables de entorno
+        $this->phoneNumberId = env('WHATSAPP_PHONE_NUMBER_ID', '622368397626491');
+        $this->token = env('WHATSAPP_API_TOKEN', 'EAAz2avvOZAHsBOzbiv5FsBPmQxzUz5j1KBcjdZA5DEJLNxuqSsTj3rzb3KZCwnlJIwgZA3o51dYBz0FKlBALZB5eQxrDyFgMUXQchAZAeNRhPlR8RunF202Yg25wZCPc4NeUSqZChdLgy6WZAzb2wW1VstmnLV6W1WPUjJKyJ6R7GG6MrLFYV7JUBzosdJxHVuj6poEnpNNQtsSRZB79RVDsDetv3KAG4qA1EvcicZD');
+
+        Log::info('WhatsAppService::__construct - Configuración cargada', [
+            'phoneNumberId' => $this->phoneNumberId,
+            'token_length' => strlen($this->token),
+            'token_first_10' => substr($this->token, 0, 10) . '...'
+        ]);
+    }
 
     /**
      * Envía un mensaje de WhatsApp al cliente cuando se marca una reserva como pagada
@@ -21,26 +34,40 @@ class WhatsAppService
     public function sendPaymentConfirmation(string $phone, array $data): bool
     {
         try {
+            // Verificar que el token y phoneNumberId estén configurados
+            if (empty($this->token)) {
+                Log::error('WhatsAppService::sendPaymentConfirmation - Token no configurado');
+                return false;
+            }
+
+            if (empty($this->phoneNumberId)) {
+                Log::error('WhatsAppService::sendPaymentConfirmation - PhoneNumberId no configurado');
+                return false;
+            }
+
             // Obtener el número formateado (asegurarse de que no tenga el prefijo '+')
             $formattedPhone = $this->formatPhoneNumber($phone);
 
             Log::info('WhatsAppService::sendPaymentConfirmation - Iniciando envío', [
                 'phone_original' => $phone,
-                'phone_formatted' => $formattedPhone
+                'phone_formatted' => $formattedPhone,
+                'data' => $data
             ]);
 
-            // Intentar primero con plantilla hello_world (que es la plantilla por defecto aprobada)
-            $response = $this->sendTemplateMessage($formattedPhone, 'hello_world');
+            // URL de la API
+            $url = "https://graph.facebook.com/v17.0/{$this->phoneNumberId}/messages";
 
-            if ($response) {
-                Log::info('WhatsAppService::sendPaymentConfirmation - Mensaje de plantilla enviado correctamente');
-                return true;
+            // Primero intentamos con la plantilla 'confirmacion_reserva'
+            Log::info('WhatsAppService::sendPaymentConfirmation - Intentando con plantilla confirmacion_reserva');
+            $success = $this->sendTemplateMessage($url, $formattedPhone, 'confirmacion_reserva', $data);
+
+            // Si falla, intentamos con 'hello_world' como fallback
+            if (!$success) {
+                Log::info('WhatsAppService::sendPaymentConfirmation - Plantilla confirmacion_reserva falló, intentando con hello_world');
+                $success = $this->sendTemplateMessage($url, $formattedPhone, 'hello_world', []);
             }
 
-            // Si falla la plantilla, intentar con mensaje de texto simple
-            Log::info('WhatsAppService::sendPaymentConfirmation - Intentando con mensaje de texto directo');
-            return $this->sendTextMessage($formattedPhone, $data);
-
+            return $success;
         } catch (\Exception $e) {
             Log::error('WhatsAppService::sendPaymentConfirmation - Excepción', [
                 'exception' => get_class($e),
@@ -52,86 +79,54 @@ class WhatsAppService
     }
 
     /**
-     * Envía un mensaje usando una plantilla predefinida
+     * Envía un mensaje con una plantilla específica
      */
-    private function sendTemplateMessage(string $phone, string $templateName): bool
+    private function sendTemplateMessage(string $url, string $formattedPhone, string $templateName, array $data): bool
     {
-        try {
-            // URL de la API
-            $url = "https://graph.facebook.com/v17.0/{$this->phoneNumberId}/messages";
+        // Construir el payload según la plantilla
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $formattedPhone,
+            'type' => 'template',
+            'template' => [
+                'name' => $templateName,
+                'language' => [
+                    'code' => $templateName === 'hello_world' ? 'en_US' : 'es_CL'
+                ]
+            ]
+        ];
 
-            // Payload para plantilla
-            $postData = json_encode([
-                'messaging_product' => 'whatsapp',
-                'recipient_type' => 'individual',
-                'to' => $phone,
-                'type' => 'template',
-                'template' => [
-                    'name' => $templateName,
-                    'language' => [
-                        'code' => 'en_US'
+        // Agregar componentes para plantillas personalizadas
+        if ($templateName === 'confirmacion_reserva') {
+            $payload['template']['components'] = [
+                [
+                    'type' => 'body',
+                    'parameters' => [
+                        [
+                            'type' => 'text',
+                            'text' => $data['nombre_cliente'] ?? 'nombre_cliente'
+                        ],
+                        [
+                            'type' => 'text',
+                            'text' => $data['destino'] ?? 'destino'
+                        ],
+                        [
+                            'type' => 'text',
+                            'text' => $data['fecha'] ?? 'fecha'
+                        ]
                     ]
                 ]
-            ]);
-
-            Log::info('WhatsAppService::sendTemplateMessage - Enviando plantilla', [
-                'template' => $templateName,
-                'phone' => $phone
-            ]);
-
-            return $this->executeApiCall($url, $postData);
-        } catch (\Exception $e) {
-            Log::error('WhatsAppService::sendTemplateMessage - Error', [
-                'message' => $e->getMessage()
-            ]);
-            return false;
+            ];
         }
-    }
 
-    /**
-     * Envía un mensaje de texto simple
-     */
-    private function sendTextMessage(string $phone, array $data): bool
-    {
-        try {
-            // URL de la API
-            $url = "https://graph.facebook.com/v17.0/{$this->phoneNumberId}/messages";
+        $postData = json_encode($payload);
 
-            // Crear mensaje simple
-            $message = "Hola " . ($data['nombre'] ?? 'Cliente') . "! Tu reserva para " .
-                      ($data['destino'] ?? 'tu viaje') . " con fecha " .
-                      ($data['fecha'] ?? 'programada') . " ha sido confirmada. Gracias por elegir Explora Chile Tour!";
+        Log::info("WhatsAppService::sendTemplateMessage - Enviando mensaje con plantilla {$templateName}", [
+            'payload' => $payload,
+            'url' => $url
+        ]);
 
-            // Payload para mensaje de texto
-            $postData = json_encode([
-                'messaging_product' => 'whatsapp',
-                'recipient_type' => 'individual',
-                'to' => $phone,
-                'type' => 'text',
-                'text' => [
-                    'preview_url' => false,
-                    'body' => $message
-                ]
-            ]);
-
-            Log::info('WhatsAppService::sendTextMessage - Enviando texto', [
-                'message' => $message
-            ]);
-
-            return $this->executeApiCall($url, $postData);
-        } catch (\Exception $e) {
-            Log::error('WhatsAppService::sendTextMessage - Error', [
-                'message' => $e->getMessage()
-            ]);
-            return false;
-        }
-    }
-
-    /**
-     * Ejecuta la llamada a la API de WhatsApp
-     */
-    private function executeApiCall(string $url, string $postData): bool
-    {
         // Configuración de CURL
         $curl = curl_init();
         curl_setopt_array($curl, [
@@ -145,6 +140,7 @@ class WhatsAppService
             CURLOPT_POSTFIELDS => $postData,
             CURLOPT_SSL_VERIFYHOST => 0,
             CURLOPT_SSL_VERIFYPEER => 0,
+            CURLOPT_VERBOSE => true,
             CURLOPT_HTTPHEADER => [
                 'Authorization: Bearer ' . $this->token,
                 'Content-Type: application/json',
@@ -158,14 +154,14 @@ class WhatsAppService
         curl_close($curl);
 
         // Registrar respuesta completa para debugging
-        Log::info('WhatsAppService::executeApiCall - Respuesta API', [
+        Log::info("WhatsAppService::sendTemplateMessage - Respuesta para plantilla {$templateName}", [
             'response' => $response,
             'error' => $error,
             'http_code' => $info['http_code'] ?? 0
         ]);
 
         if ($error) {
-            Log::error('WhatsAppService::executeApiCall - Error CURL', [
+            Log::error("WhatsAppService::sendTemplateMessage - Error CURL con plantilla {$templateName}", [
                 'error_message' => $error
             ]);
             return false;
@@ -175,43 +171,41 @@ class WhatsAppService
 
         // Verificar que la respuesta contiene un mensaje ID (éxito)
         if (isset($responseData['messages']) && is_array($responseData['messages']) && count($responseData['messages']) > 0) {
-            Log::info('WhatsAppService::executeApiCall - Mensaje enviado correctamente', [
+            Log::info("WhatsAppService::sendTemplateMessage - Mensaje con plantilla {$templateName} enviado correctamente", [
                 'message_id' => $responseData['messages'][0]['id'] ?? 'unknown'
             ]);
             return true;
         } else if (isset($responseData['error'])) {
-            Log::error('WhatsAppService::executeApiCall - Error de la API', [
-                'error_code' => $responseData['error']['code'] ?? 'unknown',
-                'error_message' => $responseData['error']['message'] ?? 'unknown'
-            ]);
+            // Verificar si el error es debido a que el usuario no ha iniciado la conversación
+            $errorCode = $responseData['error']['code'] ?? 0;
+            $errorMessage = $responseData['error']['message'] ?? '';
+
+            // Si el error indica que no se puede mandar mensaje debido a las políticas de WhatsApp
+            if ($errorCode == 131047 || $errorCode == 131051 ||
+                strpos($errorMessage, 'message') !== false && strpos($errorMessage, 'policy') !== false) {
+
+                Log::warning("WhatsAppService::sendTemplateMessage - No se puede enviar mensaje porque el usuario no ha iniciado conversación en las últimas 24 horas", [
+                    'phone' => $formattedPhone,
+                    'template' => $templateName,
+                    'error_code' => $errorCode,
+                    'error_message' => $errorMessage
+                ]);
+
+                // Aquí podrías guardar este número en una tabla para intentarlo más tarde
+                // o enviar un SMS alternativo
+            } else {
+                Log::error("WhatsAppService::sendTemplateMessage - Error de la API con plantilla {$templateName}", [
+                    'error_code' => $responseData['error']['code'] ?? 'unknown',
+                    'error_message' => $responseData['error']['message'] ?? 'unknown',
+                    'error_details' => isset($responseData['error']['error_data']) ? ($responseData['error']['error_data']['details'] ?? 'unknown') : 'unknown',
+                    'error_subcode' => $responseData['error']['error_subcode'] ?? 'unknown',
+                    'error_type' => $responseData['error']['type'] ?? 'unknown',
+                    'full_response' => $responseData
+                ]);
+            }
         }
 
         return false;
-    }
-
-    /**
-     * Crea un mensaje de texto para WhatsApp similar al correo electrónico
-     */
-    private function createTextMessageFromEmail(array $data): string
-    {
-        $nombre = $data['nombre'] ?? 'Cliente';
-        $destino = $data['destino'] ?? 'su viaje';
-        $fecha = $data['fecha'] ?? 'la fecha programada';
-
-        return "¡Hola {$nombre}! 👋\n\n" .
-               "✅ *¡Tu reserva ha sido confirmada!*\n" .
-               "Prepárate para vivir una experiencia inolvidable.\n\n" .
-               "Gracias por elegir *Explora Chile Tour* para tu próxima aventura. Estamos emocionados de acompañarte en este viaje.\n\n" .
-               "*📋 DETALLES DEL VIAJE:*\n" .
-               "• *Destino:* {$destino}\n" .
-               "• *Fecha de viaje:* {$fecha}\n" .
-               "• *Estado:* Confirmado ✅\n\n" .
-               "*🌟 INCLUYE:*\n" .
-               "• Asistencia 24/7\n" .
-               "• 20kg Equipaje\n" .
-               "• Seguro Incluido\n\n" .
-               "Si tienes alguna pregunta sobre tu reserva, no dudes en contactarnos.\n\n" .
-               "¡Esperamos que disfrutes de tu viaje! 🌎✈️";
     }
 
     /**
