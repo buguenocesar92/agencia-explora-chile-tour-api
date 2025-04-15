@@ -87,53 +87,61 @@ class ReservationService
     public function updateReservation(int $id, array $data)
     {
         return DB::transaction(function () use ($id, $data) {
-            // Obtener la reserva con sus relaciones
+            // Obtener la reserva
             $reservation = $this->reservationRepo->getById($id);
 
-            // Actualizar campos propios de la reserva
+            // Actualizar campos directos de la reserva
+            if (isset($data['status'])) {
+                $reservation->status = $data['status'];
+            }
             if (isset($data['description'])) {
                 $reservation->description = $data['description'];
             }
-            if (isset($data['status'])) {
-                $reservation->status = $data['status'];
+            if (isset($data['descripcion'])) {
+                $reservation->descripcion = $data['descripcion'];
             }
             if (isset($data['date'])) {
                 $reservation->date = $data['date'];
             }
+
+            // Guardar la reserva
             $reservation->save();
 
-            // Actualizar el cliente
-            if (isset($data['client'])) {
+            // Actualizar el cliente si se proporciona
+            if (isset($data['client']) && is_array($data['client']) && $reservation->client) {
                 $reservation->client->update($data['client']);
             }
 
-            // Actualizar el viaje
-            if (isset($data['trip'])) {
+            // Actualizar el viaje si se proporciona
+            if (isset($data['trip']) && is_array($data['trip']) && $reservation->trip) {
                 $reservation->trip->update($data['trip']);
             }
 
-            // Actualizar el pago
-            if (isset($data['payment'])) {
-                // Si se envía un nuevo comprobante (archivo), procesarlo
-                if (
-                    isset($data['payment']['receipt']) &&
-                    $data['payment']['receipt'] instanceof UploadedFile
-                ) {
-                    // Eliminar el archivo anterior si existe
-                    if ($reservation->payment && $reservation->payment->receipt) {
+            // Actualizar el pago si se proporciona
+            if (isset($data['payment']) && is_array($data['payment']) && $reservation->payment) {
+                // Procesar nuevo comprobante de pago si se proporciona
+                if (isset($data['payment']['receipt']) && $data['payment']['receipt'] instanceof UploadedFile) {
+                    // Eliminar archivo anterior si existe
+                    if ($reservation->payment->receipt) {
                         Storage::disk('s3')->delete($reservation->payment->receipt);
                     }
 
+                    // Almacenar nuevo archivo
                     $path = $data['payment']['receipt']->store('payments', [
                         'disk' => 's3',
                         'visibility' => 'public'
                     ]);
+
+                    // Actualizar la ruta del archivo
                     $data['payment']['receipt'] = $path;
                 }
+
+                // Actualizar el modelo de pago
                 $reservation->payment->update($data['payment']);
             }
 
-            return $reservation;
+            // Recargar la reserva con sus relaciones
+            return $reservation->fresh(['client', 'trip', 'payment']);
         });
     }
 

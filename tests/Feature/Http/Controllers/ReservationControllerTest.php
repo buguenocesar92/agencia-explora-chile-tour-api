@@ -210,6 +210,134 @@ class ReservationControllerTest extends TestCase
         $this->assertEquals('paid', $response->json('reservations.0.status'));
     }
 
+    public function test_index_filters_by_date()
+    {
+        // Arrange
+        $client = new Client();
+        $client->name = 'Test Client';
+        $client->email = 'test@example.com';
+        $client->phone = '123456789';
+        $client->rut = '12345678-9';
+        $client->date_of_birth = '1990-01-01';
+        $client->nationality = 'Chilena';
+        $client->save();
+
+        $tourTemplate = new TourTemplate();
+        $tourTemplate->name = 'Test Tour';
+        $tourTemplate->description = 'Test Description';
+        $tourTemplate->destination = 'Test Destination';
+        $tourTemplate->save();
+
+        $trip = new Trip();
+        $trip->tour_template_id = $tourTemplate->id;
+        $trip->departure_date = '2024-12-01';
+        $trip->return_date = '2024-12-10';
+        $trip->save();
+
+        $payment = new Payment();
+        $payment->receipt = 'receipt.jpg';
+        $payment->save();
+
+        // Reserva para hoy
+        $today = now()->toDateString();
+        $reservation1 = new Reservation();
+        $reservation1->client_id = $client->id;
+        $reservation1->trip_id = $trip->id;
+        $reservation1->payment_id = $payment->id;
+        $reservation1->date = $today;
+        $reservation1->status = 'not paid';
+        $reservation1->save();
+
+        // Reserva para mañana
+        $tomorrow = now()->addDay()->toDateString();
+        $reservation2 = new Reservation();
+        $reservation2->client_id = $client->id;
+        $reservation2->trip_id = $trip->id;
+        $reservation2->payment_id = $payment->id;
+        $reservation2->date = $tomorrow;
+        $reservation2->status = 'not paid';
+        $reservation2->save();
+
+        // Act - Buscar reservas para hoy
+        $response = $this->actingAs($this->user)
+                         ->getJson("/api/reservations?date={$today}");
+
+        // Assert
+        $response->assertOk();
+        $this->assertCount(1, $response->json('reservations'));
+        $this->assertEquals($today, $response->json('reservations.0.date'));
+    }
+
+    public function test_index_filters_by_tour_id()
+    {
+        // Arrange
+        $client = new Client();
+        $client->name = 'Test Client';
+        $client->email = 'test@example.com';
+        $client->phone = '123456789';
+        $client->rut = '12345678-9';
+        $client->date_of_birth = '1990-01-01';
+        $client->nationality = 'Chilena';
+        $client->save();
+
+        // Crear dos tours diferentes
+        $tourTemplate1 = new TourTemplate();
+        $tourTemplate1->name = 'Tour A';
+        $tourTemplate1->description = 'Description A';
+        $tourTemplate1->destination = 'Destination A';
+        $tourTemplate1->save();
+
+        $tourTemplate2 = new TourTemplate();
+        $tourTemplate2->name = 'Tour B';
+        $tourTemplate2->description = 'Description B';
+        $tourTemplate2->destination = 'Destination B';
+        $tourTemplate2->save();
+
+        // Crear viajes para cada tour
+        $trip1 = new Trip();
+        $trip1->tour_template_id = $tourTemplate1->id;
+        $trip1->departure_date = '2024-12-01';
+        $trip1->return_date = '2024-12-10';
+        $trip1->save();
+
+        $trip2 = new Trip();
+        $trip2->tour_template_id = $tourTemplate2->id;
+        $trip2->departure_date = '2024-12-15';
+        $trip2->return_date = '2024-12-25';
+        $trip2->save();
+
+        $payment = new Payment();
+        $payment->receipt = 'receipt.jpg';
+        $payment->save();
+
+        // Crear reservaciones para cada viaje
+        $reservation1 = new Reservation();
+        $reservation1->client_id = $client->id;
+        $reservation1->trip_id = $trip1->id;
+        $reservation1->payment_id = $payment->id;
+        $reservation1->date = now()->toDateString();
+        $reservation1->status = 'not paid';
+        $reservation1->save();
+
+        $reservation2 = new Reservation();
+        $reservation2->client_id = $client->id;
+        $reservation2->trip_id = $trip2->id;
+        $reservation2->payment_id = $payment->id;
+        $reservation2->date = now()->toDateString();
+        $reservation2->status = 'not paid';
+        $reservation2->save();
+
+        // Act - Filtrar por el ID del primer tour
+        $response = $this->actingAs($this->user)
+                         ->getJson("/api/reservations?tour_id={$tourTemplate1->id}");
+
+        // Assert
+        $response->assertOk();
+        $this->assertCount(1, $response->json('reservations'));
+        $this->assertEquals($trip1->id, $response->json('reservations.0.trip_id'));
+        $this->assertEquals('Tour A', $response->json('reservations.0.trip.tour_template.name'));
+    }
+
     public function test_store_creates_new_reservation()
     {
         // Arrange
@@ -352,20 +480,28 @@ class ReservationControllerTest extends TestCase
         $reservation->payment_id = $payment->id;
         $reservation->date = now()->toDateString();
         $reservation->status = 'not paid';
-        $reservation->descripcion = 'Old description';
+        $reservation->descripcion = 'Initial description';
         $reservation->save();
 
+        // Datos completos para actualizar
         $updateData = [
-            'descripcion' => 'Updated description',
             'status' => 'paid',
-            'date' => now()->addDays(5)->toDateString(),
+            'descripcion' => 'Updated description',
             'client' => [
                 'name' => 'Updated Client Name',
+                'email' => 'updated@example.com',
+                'phone' => '987654321',
+                'rut' => '12345678-9',
                 'date_of_birth' => '1990-01-01',
                 'nationality' => 'Chilena'
             ],
+            'trip' => [
+                'destination' => 'Updated Destination',
+                'departure_date' => '2024-12-15',
+                'return_date' => '2024-12-25'
+            ],
             'payment' => [
-                'receipt' => 'updated_receipt.jpg'
+                'receipt' => UploadedFile::fake()->image('updated_receipt.jpg')
             ]
         ];
 
@@ -426,9 +562,9 @@ class ReservationControllerTest extends TestCase
         $reservation->status = 'not paid';
         $reservation->save();
 
-        // Act
+        // Act - Corregir el método HTTP y la ruta para que coincida con las rutas definidas
         $response = $this->actingAs($this->user)
-                         ->patchJson("/api/reservations/{$reservation->id}/status", [
+                         ->putJson("/api/reservations/status/{$reservation->id}", [
                              'status' => 'paid'
                          ]);
 
@@ -490,5 +626,123 @@ class ReservationControllerTest extends TestCase
         $this->assertDatabaseMissing('reservations', [
             'id' => $reservation->id
         ]);
+    }
+
+    public function test_show_returns_404_for_nonexistent_reservation()
+    {
+        // Act
+        $response = $this->actingAs($this->user)
+                         ->getJson('/api/reservations/9999');
+
+        // Assert
+        $response->assertStatus(404);
+    }
+
+    public function test_update_returns_404_for_nonexistent_reservation()
+    {
+        // Arrange
+        $updateData = [
+            'status' => 'paid',
+            'descripcion' => 'Test description',
+            'client' => [
+                'name' => 'Test Client',
+                'email' => 'test@example.com',
+                'phone' => '123456789',
+                'rut' => '12345678-9',
+                'date_of_birth' => '1990-01-01',
+                'nationality' => 'Chilena'
+            ],
+            'trip' => [
+                'destination' => 'Test Destination',
+                'departure_date' => '2024-12-01',
+                'return_date' => '2024-12-10'
+            ],
+            'payment' => [
+                'receipt' => UploadedFile::fake()->image('receipt.jpg')
+            ]
+        ];
+
+        // Act
+        $response = $this->actingAs($this->user)
+                         ->putJson('/api/reservations/9999', $updateData);
+
+        // Assert
+        $response->assertStatus(404);
+    }
+
+    public function test_delete_returns_404_for_nonexistent_reservation()
+    {
+        // Act
+        $response = $this->actingAs($this->user)
+                         ->deleteJson('/api/reservations/9999');
+
+        // Assert
+        $response->assertStatus(404);
+    }
+
+    public function test_update_status_validates_invalid_status()
+    {
+        // Arrange
+        $client = new Client();
+        $client->name = 'Test Client';
+        $client->email = 'test@example.com';
+        $client->phone = '123456789';
+        $client->rut = '12345678-9';
+        $client->date_of_birth = '1990-01-01';
+        $client->nationality = 'Chilena';
+        $client->save();
+
+        $tourTemplate = new TourTemplate();
+        $tourTemplate->name = 'Test Tour';
+        $tourTemplate->description = 'Test Description';
+        $tourTemplate->destination = 'Test Destination';
+        $tourTemplate->save();
+
+        $trip = new Trip();
+        $trip->tour_template_id = $tourTemplate->id;
+        $trip->departure_date = '2024-12-01';
+        $trip->return_date = '2024-12-10';
+        $trip->save();
+
+        $payment = new Payment();
+        $payment->receipt = 'receipt.jpg';
+        $payment->save();
+
+        $reservation = new Reservation();
+        $reservation->client_id = $client->id;
+        $reservation->trip_id = $trip->id;
+        $reservation->payment_id = $payment->id;
+        $reservation->date = now()->toDateString();
+        $reservation->status = 'not paid';
+        $reservation->save();
+
+        // Act - Corregir el método HTTP y la ruta para que coincida con las rutas definidas
+        $response = $this->actingAs($this->user)
+                         ->putJson("/api/reservations/status/{$reservation->id}", [
+                             'status' => 'invalid_status'
+                         ]);
+
+        // Assert
+        $response->assertStatus(422)
+                 ->assertJsonValidationErrors(['status']);
+
+        // Verificar que la reserva mantiene su estado original
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'status' => 'not paid'
+        ]);
+    }
+
+    public function test_store_validates_missing_required_fields()
+    {
+        // Act
+        $response = $this->actingAs($this->user)
+                         ->postJson('/api/reservations', []);
+
+        // Assert
+        $response->assertStatus(422)
+                 ->assertJsonValidationErrors(['client', 'trip']);
+
+        // No validamos 'payment' porque la validación actual no lo requiere
     }
 }
