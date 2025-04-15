@@ -75,6 +75,7 @@ class ClientController extends Controller
             return response()->json($client);
         }
 
-        return response()->json(null);
+        // Devolver 404 cuando no se encuentra el cliente
+        return response()->json(['message' => 'No se encontró ningún cliente con el RUT proporcionado'], 404);
     }
 }
