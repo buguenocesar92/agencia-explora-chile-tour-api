@@ -7,6 +7,7 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 class ReservationsExport
 {
@@ -37,9 +38,7 @@ class ReservationsExport
         $sheet->setCellValue('F1', 'Destino/Tour');
         $sheet->setCellValue('G1', 'Fecha');
         $sheet->setCellValue('H1', 'Estado');
-        $sheet->setCellValue('I1', 'Monto');
-        $sheet->setCellValue('J1', 'Método de Pago');
-        $sheet->setCellValue('K1', 'Fecha de Pago');
+        $sheet->setCellValue('I1', 'Comprobante de Pago');
 
         // Consultar las reservas con sus relaciones
         $query = Reservation::with(['client', 'trip.tourTemplate', 'payment']);
@@ -69,15 +68,28 @@ class ReservationsExport
             $sheet->setCellValue('E' . $row, $reservation->client->phone ?? 'N/A');
             $sheet->setCellValue('F' . $row, $reservation->trip->tourTemplate->name ?? 'N/A');
             $sheet->setCellValue('G' . $row, $reservation->trip->departure_date ?? $reservation->date);
-            $sheet->setCellValue('H' . $row, $reservation->status);
-            $sheet->setCellValue('I' . $row, $reservation->payment->amount ?? 'N/A');
-            $sheet->setCellValue('J' . $row, $reservation->payment->method ?? 'N/A');
-            $sheet->setCellValue('K' . $row, $reservation->payment->payment_date ?? 'N/A');
+
+            // Cambiar la visualización del estado
+            $status = $reservation->status === 'paid' ? 'Pagado' : 'No pagado';
+            $sheet->setCellValue('H' . $row, $status);
+
+            // Agregar URL del comprobante de pago
+            $receiptUrl = 'N/A';
+            if ($reservation->payment && $reservation->payment->receipt) {
+                // Construir la URL del comprobante de pago en S3
+                $baseUrl = rtrim(config('filesystems.disks.s3.url'), '/');
+                if (empty($baseUrl)) {
+                    $baseUrl = rtrim(config('filesystems.disks.s3.endpoint'), '/');
+                }
+                $receiptUrl = $baseUrl . '/' . $reservation->payment->receipt;
+            }
+            $sheet->setCellValue('I' . $row, $receiptUrl);
+
             $row++;
         }
 
         // Autoajustar columnas
-        foreach (range('A', 'K') as $column) {
+        foreach (range('A', 'I') as $column) {
             $sheet->getColumnDimension($column)->setAutoSize(true);
         }
 
