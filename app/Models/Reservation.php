@@ -11,7 +11,8 @@ class Reservation extends Model
         'trip_id',
         'payment_id',
         'date',
-        'description'
+        'descripcion',
+        'status'
     ];
 
     public function client()
