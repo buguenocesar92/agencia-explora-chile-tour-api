@@ -179,4 +179,46 @@ class ReservationController extends Controller
             'message' => 'Reserva eliminada correctamente',
         ]);
     }
+
+    /**
+     * Exporta las reservas a formato XLSX
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function exportToExcel(Request $request): JsonResponse
+    {
+        try {
+            // Obtener los filtros de la solicitud
+            $filters = [];
+
+            if ($request->has('tour_id')) {
+                $filters['tour_id'] = $request->input('tour_id');
+            }
+
+            if ($request->has('status')) {
+                $filters['status'] = $request->input('status');
+            }
+
+            if ($request->has('date')) {
+                $filters['date'] = $request->input('date');
+            }
+
+            // Exportar a Excel
+            $fileUrl = $this->reservationService->exportToExcel($filters);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Archivo Excel generado correctamente',
+                'url' => $fileUrl
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error al exportar reservas a Excel: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al generar el archivo Excel: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

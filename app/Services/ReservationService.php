@@ -10,6 +10,7 @@ use App\Repositories\Contracts\ReservationRepositoryInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use App\Exports\ReservationsExport;
 
 class ReservationService
 {
@@ -159,5 +160,53 @@ class ReservationService
             // Eliminar la reserva
             return $this->reservationRepo->delete($id);
         });
+    }
+
+    /**
+     * Exporta reservas a un archivo XLSX
+     *
+     * @param array $filters Filtros a aplicar a las reservas (tour_id, status, date)
+     * @return string URL del archivo generado
+     */
+    public function exportToExcel(array $filters = []): string
+    {
+        // Crear el exportador con los filtros
+        $exporter = new ReservationsExport($filters);
+
+        // Obtener la ruta del archivo generado
+        $filePath = $exporter->export();
+
+        // Verificar si el archivo existe
+        if (!file_exists($filePath)) {
+            throw new \Exception('Error al generar el archivo Excel');
+        }
+
+        // Generar nombre único para el archivo en S3
+        $fileName = 'reservas_' . Carbon::now()->format('Y-m-d_His') . '.xlsx';
+        $s3Path = 'exports/' . $fileName;
+
+        // Subir el archivo al bucket S3
+        $fileContents = file_get_contents($filePath);
+        Storage::disk('s3')->put($s3Path, $fileContents, [
+            'visibility' => 'public',
+            'ContentType' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ]);
+
+        // Eliminar el archivo temporal
+        @unlink($filePath);
+
+        // Usar la URL configurada en .env para acceder al archivo
+        $baseUrl = rtrim(config('filesystems.disks.s3.url'), '/');
+
+        // Comprobar si la URL base está disponible en la configuración
+        if (empty($baseUrl)) {
+            // Usar la URL del endpoint como alternativa
+            $baseUrl = rtrim(config('filesystems.disks.s3.endpoint'), '/');
+        }
+
+        // Construir la URL completa
+        $url = $baseUrl . '/' . $s3Path;
+
+        return $url;
     }
 }

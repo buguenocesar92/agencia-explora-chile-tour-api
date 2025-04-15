@@ -14,6 +14,9 @@ Route::group(['prefix' => 'reservations'], function () {
     Route::delete('/{id}', [ReservationController::class, 'destroy'])->name('reservations.destroy');
     Route::put('/{id}/mark-as-paid', [ReservationController::class, 'markAsPaid'])->name('reservations.markAsPaid');
 
+    // Ruta para exportar reservas a Excel
+    Route::get('/export/excel', [ReservationController::class, 'exportToExcel'])->name('reservations.exportToExcel');
+
     // Ruta de prueba para el servicio de WhatsApp
     Route::get('/test/whatsapp/{phone}', function ($phone) {
         try {
