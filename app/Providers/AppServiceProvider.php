@@ -9,9 +9,13 @@ use App\Repositories\TaskRepository;
 use App\Models\Trip;
 use App\Models\TourTemplate;
 use App\Models\Client;
+use App\Models\Payment;
+use App\Models\Reservation;
 use App\Observers\TripObserver;
 use App\Observers\TourTemplateObserver;
 use App\Observers\ClientObserver;
+use App\Observers\PaymentObserver;
+use App\Observers\ReservationObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -53,5 +57,7 @@ class AppServiceProvider extends ServiceProvider
         Trip::observe(TripObserver::class);
         TourTemplate::observe(TourTemplateObserver::class);
         Client::observe(ClientObserver::class);
+        Payment::observe(PaymentObserver::class);
+        Reservation::observe(ReservationObserver::class);
     }
 }
