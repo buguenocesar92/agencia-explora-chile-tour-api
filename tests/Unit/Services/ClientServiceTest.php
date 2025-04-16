@@ -41,7 +41,7 @@ class ClientServiceTest extends TestCase
 
         $this->mockRepo->shouldReceive('getAll')
             ->once()
-            ->with('test')
+            ->with('test', false)
             ->andReturn($clients);
 
         // Act
@@ -149,7 +149,7 @@ class ClientServiceTest extends TestCase
 
         $this->mockRepo->shouldReceive('findByRut')
             ->once()
-            ->with('123456789')
+            ->with('123456789', false)
             ->andReturn($client);
 
         // Act

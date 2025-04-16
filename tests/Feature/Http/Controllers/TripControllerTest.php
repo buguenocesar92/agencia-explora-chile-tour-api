@@ -208,7 +208,7 @@ class TripControllerTest extends TestCase
             ]);
 
         // Verificar que se eliminó de la base de datos
-        $this->assertDatabaseMissing('trips', ['id' => $trip->id]);
+        $this->assertSoftDeleted('trips', ['id' => $trip->id]);
     }
 
     public function test_destroy_returns_404_for_non_existent_trip()

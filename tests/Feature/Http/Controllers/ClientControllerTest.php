@@ -249,8 +249,8 @@ class ClientControllerTest extends TestCase
                 'message' => 'Cliente eliminado con éxito.'
             ]);
 
-        // Verificar que se eliminó de la base de datos
-        $this->assertDatabaseMissing('clients', ['id' => $client->id]);
+        // Verificar que se marcó como eliminado (soft delete)
+        $this->assertSoftDeleted('clients', ['id' => $client->id]);
     }
 
     public function test_destroy_returns_404_for_non_existent_client()

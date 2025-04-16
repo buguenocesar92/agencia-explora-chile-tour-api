@@ -212,7 +212,7 @@ class TourControllerTest extends TestCase
             ]);
 
         // Verificar que se eliminó de la base de datos
-        $this->assertDatabaseMissing('tour_templates', ['id' => $tour->id]);
+        $this->assertSoftDeleted('tour_templates', ['id' => $tour->id]);
     }
 
     public function test_destroy_returns_404_for_non_existent_tour()

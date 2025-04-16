@@ -116,7 +116,7 @@ class ReservationController extends Controller
                 }
 
                 // 2. Enviar WhatsApp
-                if ($reservation->client->phone) {
+/*                 if ($reservation->client->phone) {
                     Log::info('ReservationController::updateStatus - Enviando WhatsApp', [
                         'phone' => $reservation->client->phone
                     ]);
@@ -138,7 +138,7 @@ class ReservationController extends Controller
                     }
                 } else {
                     Log::info('ReservationController::updateStatus - No se envía WhatsApp: sin teléfono');
-                }
+                } */
             } else {
                 Log::warning('ReservationController::updateStatus - No se encontró cliente para la reserva');
             }

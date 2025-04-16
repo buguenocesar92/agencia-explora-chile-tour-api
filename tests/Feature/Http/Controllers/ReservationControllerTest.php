@@ -33,6 +33,11 @@ class ReservationControllerTest extends TestCase
 
         // Configurar almacenamiento falso
         Storage::fake('s3');
+
+        // Mock del servicio WhatsApp para evitar llamadas reales
+        $this->mock(\App\Services\WhatsAppService::class, function ($mock) {
+            $mock->shouldReceive('sendPaymentConfirmation')->andReturn(true);
+        });
     }
 
     public function test_index_returns_reservations_list()
@@ -623,7 +628,7 @@ class ReservationControllerTest extends TestCase
         $response->assertOk()
                  ->assertJsonPath('message', 'Reserva eliminada correctamente');
 
-        $this->assertDatabaseMissing('reservations', [
+        $this->assertSoftDeleted('reservations', [
             'id' => $reservation->id
         ]);
     }
