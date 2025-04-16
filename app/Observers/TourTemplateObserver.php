@@ -43,6 +43,23 @@ class TourTemplateObserver
                 ->update(['deleted_at' => now()]);
 
             Log::info('TourTemplateObserver: reservations soft deleted (DB approach)', ['count' => $reservationCount]);
+
+            // Obtener los ids de reservas para encontrar pagos
+            $reservationIds = DB::table('reservations')
+                ->whereIn('trip_id', $tripIds)
+                ->pluck('id')
+                ->toArray();
+
+            if (!empty($reservationIds)) {
+                // Soft delete de los pagos asociados a las reservas
+                $paymentCount = DB::table('payments')
+                    ->join('reservations', 'payments.id', '=', 'reservations.payment_id')
+                    ->whereIn('reservations.id', $reservationIds)
+                    ->whereNull('payments.deleted_at')
+                    ->update(['payments.deleted_at' => now()]);
+
+                Log::info('TourTemplateObserver: payments soft deleted (DB approach)', ['count' => $paymentCount]);
+            }
         }
     }
 
@@ -80,6 +97,23 @@ class TourTemplateObserver
                 ->update(['deleted_at' => null]);
 
             Log::info('TourTemplateObserver: reservations restored (DB approach)', ['count' => $reservationCount]);
+
+            // Obtener los ids de reservas para encontrar pagos
+            $reservationIds = DB::table('reservations')
+                ->whereIn('trip_id', $tripIds)
+                ->pluck('id')
+                ->toArray();
+
+            if (!empty($reservationIds)) {
+                // Restaurar los pagos asociados a las reservas
+                $paymentCount = DB::table('payments')
+                    ->join('reservations', 'payments.id', '=', 'reservations.payment_id')
+                    ->whereIn('reservations.id', $reservationIds)
+                    ->whereNotNull('payments.deleted_at')
+                    ->update(['payments.deleted_at' => null]);
+
+                Log::info('TourTemplateObserver: payments restored (DB approach)', ['count' => $paymentCount]);
+            }
         }
     }
 }
