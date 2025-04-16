@@ -12,4 +12,6 @@ Route::group([
     Route::get('/{id}', [TripController::class, 'show']);
     Route::put('/{id}', [TripController::class, 'update']);
     Route::delete('/{id}', [TripController::class, 'destroy']);
+    Route::put('/{id}/restore', [TripController::class, 'restore']);
+    Route::delete('/{id}/force', [TripController::class, 'forceDelete']);
 });

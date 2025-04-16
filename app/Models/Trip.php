@@ -20,7 +20,7 @@ class Trip extends Model
 
     public function tourTemplate()
     {
-        return $this->belongsTo(TourTemplate::class);
+        return $this->belongsTo(TourTemplate::class)->withTrashed();
     }
 
     public function reservations()
