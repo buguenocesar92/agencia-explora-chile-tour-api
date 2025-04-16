@@ -15,11 +15,6 @@ class TripController extends Controller
         // Iniciamos la consulta
         $query = Trip::with('tourTemplate');
 
-        // Incluir trips eliminados si se solicita
-        if ($request->has('with_trashed') && $request->with_trashed) {
-            $query->withTrashed();
-        }
-
         // Aplicamos filtros si están presentes en la petición
         if ($request->has('tour_template_id')) {
             $query->where('tour_template_id', $request->tour_template_id);
@@ -86,7 +81,7 @@ class TripController extends Controller
     }
 
     /**
-     * Elimina un trip (soft delete).
+     * Elimina un trip.
      */
     public function destroy($id)
     {
@@ -95,33 +90,6 @@ class TripController extends Controller
 
         return response()->json([
             'message' => 'Trip eliminado correctamente',
-        ]);
-    }
-
-    /**
-     * Restaura un trip eliminado.
-     */
-    public function restore($id)
-    {
-        $trip = Trip::withTrashed()->findOrFail($id);
-        $trip->restore();
-
-        return response()->json([
-            'message' => 'Trip restaurado correctamente',
-            'trip' => $trip
-        ]);
-    }
-
-    /**
-     * Elimina permanentemente un trip.
-     */
-    public function forceDelete($id)
-    {
-        $trip = Trip::withTrashed()->findOrFail($id);
-        $trip->forceDelete();
-
-        return response()->json([
-            'message' => 'Trip eliminado permanentemente'
         ]);
     }
 }

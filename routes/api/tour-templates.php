@@ -12,6 +12,4 @@ Route::group([
     Route::get('/{id}', [TourTemplateController::class, 'show']);
     Route::put('/{id}', [TourTemplateController::class, 'update']);
     Route::delete('/{id}', [TourTemplateController::class, 'destroy']);
-    Route::put('/{id}/restore', [TourTemplateController::class, 'restore']);
-    Route::delete('/{id}/force', [TourTemplateController::class, 'forceDelete']);
 });

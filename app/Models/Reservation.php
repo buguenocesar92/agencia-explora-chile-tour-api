@@ -26,11 +26,11 @@ class Reservation extends Model
 
     public function trip()
     {
-        return $this->belongsTo(Trip::class)->withTrashed();
+        return $this->belongsTo(Trip::class);
     }
 
     public function payment()
     {
-        return $this->belongsTo(Payment::class)->withTrashed();
+        return $this->belongsTo(Payment::class);
     }
 }

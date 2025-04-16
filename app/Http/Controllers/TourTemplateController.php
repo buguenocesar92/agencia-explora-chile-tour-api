@@ -26,16 +26,10 @@ class TourTemplateController extends Controller
         ], 201);
     }
 
-    public function index (Request $request)
+    public function index ()
     {
-        // Obtener todos los TourTemplates, incluyendo eliminados si se solicita
-        $query = TourTemplate::query();
-
-        if ($request->has('with_trashed') && $request->with_trashed) {
-            $query->withTrashed();
-        }
-
-        $tourTemplates = $query->get();
+        // Obtener todos los TourTemplates
+        $tourTemplates = TourTemplate::all();
 
         // Retornar la respuesta en JSON
         return response()->json([
@@ -81,41 +75,12 @@ class TourTemplateController extends Controller
         // Obtener el TourTemplate por ID
         $tourTemplate = TourTemplate::findOrFail($id);
 
-        // Eliminar el TourTemplate (soft delete)
+        // Eliminar el TourTemplate
         $tourTemplate->delete();
 
         // Retornar la respuesta en JSON
         return response()->json([
             'message' => 'TourTemplate eliminado correctamente',
-        ]);
-    }
-
-    public function restore($id)
-    {
-        // Obtener el TourTemplate eliminado por ID
-        $tourTemplate = TourTemplate::withTrashed()->findOrFail($id);
-
-        // Restaurar el TourTemplate
-        $tourTemplate->restore();
-
-        // Retornar la respuesta en JSON
-        return response()->json([
-            'message' => 'TourTemplate restaurado correctamente',
-            'tourTemplate' => $tourTemplate
-        ]);
-    }
-
-    public function forceDelete($id)
-    {
-        // Obtener el TourTemplate por ID (incluso si está eliminado)
-        $tourTemplate = TourTemplate::withTrashed()->findOrFail($id);
-
-        // Eliminar permanentemente el TourTemplate
-        $tourTemplate->forceDelete();
-
-        // Retornar la respuesta en JSON
-        return response()->json([
-            'message' => 'TourTemplate eliminado permanentemente',
         ]);
     }
 }

@@ -6,6 +6,12 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 use App\Repositories\Contracts\TaskRepositoryInterface;
 use App\Repositories\TaskRepository;
+use App\Models\Trip;
+use App\Models\TourTemplate;
+use App\Models\Client;
+use App\Observers\TripObserver;
+use App\Observers\TourTemplateObserver;
+use App\Observers\ClientObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -42,5 +48,10 @@ class AppServiceProvider extends ServiceProvider
                 return true;
             }
         });
+
+        // Registrar observadores para soft deletes en cascada
+        Trip::observe(TripObserver::class);
+        TourTemplate::observe(TourTemplateObserver::class);
+        Client::observe(ClientObserver::class);
     }
 }
