@@ -4,6 +4,7 @@ namespace App\Repositories;
 
 use App\Models\Reservation;
 use App\Repositories\Contracts\ReservationRepositoryInterface;
+use Illuminate\Support\Facades\Storage;
 
 class ReservationRepository implements ReservationRepositoryInterface
 {
@@ -57,7 +58,20 @@ class ReservationRepository implements ReservationRepositoryInterface
 
     public function delete(int $id)
     {
-        $reservation = Reservation::findOrFail($id);
+        $reservation = Reservation::with(['payment'])->findOrFail($id);
+
+        // Primero eliminamos el pago asociado si existe
+        if ($reservation->payment) {
+            // Si tiene un comprobante, lo eliminamos del storage
+            if ($reservation->payment->receipt) {
+                Storage::disk('s3')->delete($reservation->payment->receipt);
+            }
+
+            // Eliminamos el registro de pago
+            $reservation->payment->delete();
+        }
+
+        // Ahora eliminamos la reserva
         $reservation->delete();
         return $reservation;
     }

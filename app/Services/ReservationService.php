@@ -149,15 +149,7 @@ class ReservationService
     public function deleteReservation(int $id)
     {
         return DB::transaction(function () use ($id) {
-            // Obtener la reserva con sus relaciones
-            $reservation = $this->reservationRepo->getById($id);
-
-            // Eliminar el comprobante de pago si existe
-            if ($reservation->payment && $reservation->payment->receipt) {
-                Storage::disk('s3')->delete($reservation->payment->receipt);
-            }
-
-            // Eliminar la reserva
+            // La eliminación del pago ya se maneja en el repositorio
             return $this->reservationRepo->delete($id);
         });
     }
