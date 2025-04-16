@@ -33,7 +33,27 @@ class ClientController extends Controller
 
     public function store(StoreClientRequest $request): JsonResponse
     {
-        $client = $this->clientService->create($request->validated());
+        $validatedData = $request->validated();
+
+        // Normalizar el RUT para la búsqueda
+        $normalizedRut = preg_replace('/[.-]/', '', $validatedData['rut']);
+
+        // Buscar si existe un cliente con este RUT (incluyendo soft deleted)
+        $existingClient = $this->clientService->findByRut($normalizedRut, true);
+
+        if ($existingClient && $existingClient->trashed()) {
+            // Si existe y está eliminado, lo restauramos y actualizamos
+            $this->clientService->restore($existingClient->id);
+            $client = $this->clientService->update($existingClient->id, $validatedData);
+
+            return response()->json([
+                'message' => 'Cliente restaurado y actualizado con éxito.',
+                'client' => $client
+            ], 200);
+        }
+
+        // Si no existe o no está eliminado, creamos uno nuevo
+        $client = $this->clientService->create($validatedData);
         return response()->json([
             'message' => 'Cliente creado con éxito.',
             'client' => $client

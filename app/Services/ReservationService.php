@@ -27,15 +27,49 @@ class ReservationService
             $client = Client::withTrashed()->where('rut', $data['client']['rut'])->first();
 
             if (!$client) {
+                // Antes de crear, verificar si el email ya existe
+                $emailExists = Client::where('email', $data['client']['email'])->exists();
+                if ($emailExists) {
+                    // Si el email ya está en uso, generamos un email único temporal
+                    $data['client']['email'] = $data['client']['email'] . '_' . uniqid();
+                }
+
                 // Si no existe, crear un nuevo cliente
                 $client = Client::create($data['client']);
             } else if ($client->trashed()) {
-                // Si el cliente existe pero está eliminado, restaurarlo y actualizar datos
+                // Si el cliente existe pero está eliminado, restaurarlo
                 $client->restore();
-                $client->update($data['client']);
+
+                // Verificar si el email ya existe en otro cliente
+                $emailExists = Client::where('email', $data['client']['email'])
+                    ->where('id', '!=', $client->id)
+                    ->exists();
+
+                if ($emailExists) {
+                    // Si el email ya está en uso, no lo actualizamos
+                    $clientData = $data['client'];
+                    unset($clientData['email']); // Eliminar el email de los datos a actualizar
+                    $client->update($clientData);
+                } else {
+                    // Si el email no está en uso, actualizamos todos los datos
+                    $client->update($data['client']);
+                }
             } else {
                 // Si ya existe y está activo, actualizar sus datos por si han cambiado
-                $client->update($data['client']);
+                // Verificar si el email ya existe en otro cliente
+                $emailExists = Client::where('email', $data['client']['email'])
+                    ->where('id', '!=', $client->id)
+                    ->exists();
+
+                if ($emailExists) {
+                    // Si el email ya está en uso, no lo actualizamos
+                    $clientData = $data['client'];
+                    unset($clientData['email']); // Eliminar el email de los datos a actualizar
+                    $client->update($clientData);
+                } else {
+                    // Si el email no está en uso, actualizamos todos los datos
+                    $client->update($data['client']);
+                }
             }
 
             // Obtener el viaje programado existente usando el ID que envía el wizard
