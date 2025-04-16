@@ -15,4 +15,8 @@ Route::group([
     Route::get('/{client}', [ClientController::class, 'show'])->name('clients.show');
     Route::put('/{client}', [ClientController::class, 'update'])->name('clients.update');
     Route::delete('/{client}', [ClientController::class, 'destroy'])->name('clients.destroy');
+
+    // Nuevas rutas para soft delete
+    Route::put('/{client}/restore', [ClientController::class, 'restore'])->name('clients.restore');
+    Route::delete('/{client}/force', [ClientController::class, 'forceDelete'])->name('clients.force-delete');
 });

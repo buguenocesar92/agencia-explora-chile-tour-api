@@ -23,14 +23,18 @@ class ReservationService
     public function createReservation(array $data)
     {
         return DB::transaction(function () use ($data) {
-            // Buscar si ya existe un cliente con este RUT
-            $client = Client::where('rut', $data['client']['rut'])->first();
+            // Buscar si ya existe un cliente con este RUT (incluyendo clientes eliminados)
+            $client = Client::withTrashed()->where('rut', $data['client']['rut'])->first();
 
             if (!$client) {
                 // Si no existe, crear un nuevo cliente
                 $client = Client::create($data['client']);
+            } else if ($client->trashed()) {
+                // Si el cliente existe pero está eliminado, restaurarlo y actualizar datos
+                $client->restore();
+                $client->update($data['client']);
             } else {
-                // Si ya existe, actualizar sus datos por si han cambiado
+                // Si ya existe y está activo, actualizar sus datos por si han cambiado
                 $client->update($data['client']);
             }
 

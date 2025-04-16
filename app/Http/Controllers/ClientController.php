@@ -20,7 +20,8 @@ class ClientController extends Controller
     public function index(Request $request): JsonResponse
     {
         $search = $request->input('search');
-        $clients = $this->clientService->getAll($search);
+        $withTrashed = $request->boolean('with_trashed', false);
+        $clients = $this->clientService->getAll($search, $withTrashed);
         return response()->json($clients);
     }
 
@@ -60,6 +61,7 @@ class ClientController extends Controller
     public function findByRut(Request $request): JsonResponse
     {
         $rut = $request->query('rut');
+        $withTrashed = $request->boolean('with_trashed', false);
 
         if (empty($rut)) {
             return response()->json(['message' => 'El parámetro RUT es requerido'], 400);
@@ -69,7 +71,7 @@ class ClientController extends Controller
         $normalizedRut = preg_replace('/[.-]/', '', $rut);
 
         // Buscar cliente por RUT normalizado
-        $client = $this->clientService->findByRut($normalizedRut);
+        $client = $this->clientService->findByRut($normalizedRut, $withTrashed);
 
         if ($client) {
             return response()->json($client);
@@ -77,5 +79,23 @@ class ClientController extends Controller
 
         // Devolver 404 cuando no se encuentra el cliente
         return response()->json(['message' => 'No se encontró ningún cliente con el RUT proporcionado'], 404);
+    }
+
+    /**
+     * Restaura un cliente que ha sido eliminado con soft delete.
+     */
+    public function restore(int $id): JsonResponse
+    {
+        $this->clientService->restore($id);
+        return response()->json(['message' => 'Cliente restaurado con éxito.']);
+    }
+
+    /**
+     * Elimina permanentemente un cliente.
+     */
+    public function forceDelete(int $id): JsonResponse
+    {
+        $this->clientService->forceDelete($id);
+        return response()->json(['message' => 'Cliente eliminado permanentemente.']);
     }
 }
