@@ -73,9 +73,9 @@ class ReservationService
     }
 
 
-    public function listReservations(?string $search = null, array $filters = [])
+    public function listReservations(?string $search = null, array $filters = [], bool $withTrashed = false)
     {
-        return $this->reservationRepo->getAll($search, $filters);
+        return $this->reservationRepo->getAll($search, $filters, $withTrashed);
     }
 
     // Método para actualizar el status de una reserva
@@ -84,9 +84,9 @@ class ReservationService
         return $this->reservationRepo->updateStatus($id, $status);
     }
 
-    public function getReservation(int $id)
+    public function getReservation(int $id, bool $withTrashed = false)
     {
-        return $this->reservationRepo->getById($id);
+        return $this->reservationRepo->getById($id, $withTrashed);
     }
 
     public function updateReservation(int $id, array $data)
@@ -150,11 +150,34 @@ class ReservationService
         });
     }
 
+    /**
+     * Elimina una reserva (soft delete)
+     */
     public function deleteReservation(int $id)
     {
         return DB::transaction(function () use ($id) {
             // La eliminación del pago ya se maneja en el repositorio
             return $this->reservationRepo->delete($id);
+        });
+    }
+
+    /**
+     * Restaura una reserva eliminada
+     */
+    public function restoreReservation(int $id)
+    {
+        return DB::transaction(function () use ($id) {
+            return $this->reservationRepo->restore($id);
+        });
+    }
+
+    /**
+     * Elimina permanentemente una reserva
+     */
+    public function forceDeleteReservation(int $id)
+    {
+        return DB::transaction(function () use ($id) {
+            return $this->reservationRepo->forceDelete($id);
         });
     }
 

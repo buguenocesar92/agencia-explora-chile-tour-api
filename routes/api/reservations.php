@@ -14,6 +14,10 @@ Route::group(['prefix' => 'reservations'], function () {
     Route::delete('/{id}', [ReservationController::class, 'destroy'])->name('reservations.destroy');
     Route::put('/{id}/mark-as-paid', [ReservationController::class, 'markAsPaid'])->name('reservations.markAsPaid');
 
+    // Nuevas rutas para soft delete
+    Route::put('/{id}/restore', [ReservationController::class, 'restore'])->name('reservations.restore');
+    Route::delete('/{id}/force', [ReservationController::class, 'forceDelete'])->name('reservations.forceDelete');
+
     // Ruta para exportar reservas a Excel
     Route::get('/export/excel', [ReservationController::class, 'exportToExcel'])->name('reservations.exportToExcel');
 

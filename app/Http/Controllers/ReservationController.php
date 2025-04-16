@@ -31,6 +31,7 @@ class ReservationController extends Controller
         $tourId = $request->input('tour_id');
         $status = $request->input('status');
         $date = $request->input('date');
+        $withTrashed = $request->boolean('with_trashed', false);
 
         // Crear array de filtros
         $filters = [];
@@ -48,7 +49,7 @@ class ReservationController extends Controller
             $filters['date'] = $date;
         }
 
-        $reservations = $this->reservationService->listReservations($search, $filters);
+        $reservations = $this->reservationService->listReservations($search, $filters, $withTrashed);
 
         return response()->json([
             'reservations' => $reservations,
@@ -155,7 +156,8 @@ class ReservationController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $reservation = $this->reservationService->getReservation($id);
+        $withTrashed = request()->boolean('with_trashed', false);
+        $reservation = $this->reservationService->getReservation($id, $withTrashed);
         return response()->json([
             'reservation' => $reservation,
         ]);
@@ -172,11 +174,36 @@ class ReservationController extends Controller
         ]);
     }
 
+    /**
+     * Elimina lógicamente una reserva (soft delete)
+     */
     public function destroy(int $id): JsonResponse
     {
         $this->reservationService->deleteReservation($id);
         return response()->json([
             'message' => 'Reserva eliminada correctamente',
+        ]);
+    }
+
+    /**
+     * Restaura una reserva previamente eliminada
+     */
+    public function restore(int $id): JsonResponse
+    {
+        $this->reservationService->restoreReservation($id);
+        return response()->json([
+            'message' => 'Reserva restaurada correctamente',
+        ]);
+    }
+
+    /**
+     * Elimina permanentemente una reserva
+     */
+    public function forceDelete(int $id): JsonResponse
+    {
+        $this->reservationService->forceDeleteReservation($id);
+        return response()->json([
+            'message' => 'Reserva eliminada permanentemente',
         ]);
     }
 
