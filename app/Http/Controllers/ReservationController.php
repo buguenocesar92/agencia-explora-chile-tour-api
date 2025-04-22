@@ -13,7 +13,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 use App\Services\WhatsAppService;
 
-
 class ReservationController extends Controller
 {
     private ReservationService $reservationService;
@@ -25,46 +24,39 @@ class ReservationController extends Controller
         $this->whatsAppService = $whatsAppService;
     }
 
+    /**
+     * Lista todas las reservas con filtros opcionales
+     */
     public function index(Request $request): JsonResponse
     {
-        $search = $request->input('search');
-        $tourId = $request->input('tour_id');
-        $status = $request->input('status');
-        $date = $request->input('date');
-        $withTrashed = $request->boolean('with_trashed', false);
-
-        // Crear array de filtros
-        $filters = [];
-        if ($tourId) {
-            $filters['tour_id'] = $tourId;
-        }
-
-        // Agregar filtro de status si está presente
-        if ($status) {
-            $filters['status'] = $status;
-        }
-
-        // Agregar filtro de fecha si está presente
-        if ($date) {
-            $filters['date'] = $date;
-        }
-
-        $reservations = $this->reservationService->listReservations($search, $filters, $withTrashed);
+        $filters = $this->extractFiltersFromRequest($request);
+        $reservations = $this->reservationService->listReservations(
+            $request->input('search'),
+            $filters,
+            $request->boolean('with_trashed', false)
+        );
 
         return response()->json([
             'reservations' => $reservations,
         ]);
     }
 
+    /**
+     * Crea una nueva reserva
+     */
     public function store(StoreReservationRequest $request): JsonResponse
     {
         $reservation = $this->reservationService->createReservation($request->all());
+
         return response()->json([
             'message'     => 'Reserva completada correctamente',
             'reservation' => $reservation,
         ], 201);
     }
 
+    /**
+     * Actualiza el estado de una reserva
+     */
     public function updateStatus(UpdateReservationStatusRequest $request, int $id): JsonResponse
     {
         $status = $request->input('status', 'paid');
@@ -90,58 +82,7 @@ class ReservationController extends Controller
 
         // Si la reserva fue marcada como pagada, enviar notificaciones
         if ($status === 'paid') {
-            // Verificar si tenemos los datos necesarios
-            if ($reservation->client) {
-                $datos = [
-                    'nombre'  => $reservation->client->name,
-                    'destino' => ($reservation->trip && $reservation->trip->tourTemplate)
-                               ? $reservation->trip->tourTemplate->name
-                               : 'N/A',
-                    'fecha'   => ($reservation->trip && $reservation->trip->departure_date)
-                              ? $reservation->trip->departure_date
-                              : $reservation->date,
-                ];
-
-                // 1. Enviar correo electrónico
-                if ($reservation->client->email) {
-                    Log::info('ReservationController::updateStatus - Enviando correo', [
-                        'email' => $reservation->client->email
-                    ]);
-
-                    try {
-                        Mail::to($reservation->client->email)->send(new ConfirmacionReserva($datos));
-                    } catch (\Exception $e) {
-                        Log::error('Error al enviar correo: ' . $e->getMessage());
-                    }
-                }
-
-                // 2. Enviar WhatsApp
-/*                 if ($reservation->client->phone) {
-                    Log::info('ReservationController::updateStatus - Enviando WhatsApp', [
-                        'phone' => $reservation->client->phone
-                    ]);
-
-                    try {
-                        $whatsappResult = $this->whatsAppService->sendPaymentConfirmation(
-                            $reservation->client->phone,
-                            $datos
-                        );
-
-                        Log::info('ReservationController::updateStatus - Resultado WhatsApp', [
-                            'success' => $whatsappResult
-                        ]);
-                    } catch (\Exception $e) {
-                        Log::error('Error al enviar WhatsApp: ' . $e->getMessage(), [
-                            'exception' => get_class($e),
-                            'trace' => $e->getTraceAsString()
-                        ]);
-                    }
-                } else {
-                    Log::info('ReservationController::updateStatus - No se envía WhatsApp: sin teléfono');
-                } */
-            } else {
-                Log::warning('ReservationController::updateStatus - No se encontró cliente para la reserva');
-            }
+            $this->sendNotificationsForPaidReservation($reservation);
         } else {
             Log::info('ReservationController::updateStatus - No se envían notificaciones: estado no es "paid"');
         }
@@ -152,20 +93,24 @@ class ReservationController extends Controller
         ]);
     }
 
-
-
+    /**
+     * Muestra una reserva específica
+     */
     public function show(int $id): JsonResponse
     {
         $withTrashed = request()->boolean('with_trashed', false);
         $reservation = $this->reservationService->getReservation($id, $withTrashed);
+
         return response()->json([
             'reservation' => $reservation,
         ]);
     }
 
+    /**
+     * Actualiza una reserva
+     */
     public function update(UpdateReservationRequest $request, int $id): JsonResponse
     {
-        // Se asume que el request contiene todos los campos de la reserva y sus relaciones
         $reservation = $this->reservationService->updateReservation($id, $request->all());
 
         return response()->json([
@@ -180,6 +125,7 @@ class ReservationController extends Controller
     public function destroy(int $id): JsonResponse
     {
         $this->reservationService->deleteReservation($id);
+
         return response()->json([
             'message' => 'Reserva eliminada correctamente',
         ]);
@@ -191,6 +137,7 @@ class ReservationController extends Controller
     public function restore(int $id): JsonResponse
     {
         $this->reservationService->restoreReservation($id);
+
         return response()->json([
             'message' => 'Reserva restaurada correctamente',
         ]);
@@ -202,6 +149,7 @@ class ReservationController extends Controller
     public function forceDelete(int $id): JsonResponse
     {
         $this->reservationService->forceDeleteReservation($id);
+
         return response()->json([
             'message' => 'Reserva eliminada permanentemente',
         ]);
@@ -209,29 +157,11 @@ class ReservationController extends Controller
 
     /**
      * Exporta las reservas a formato XLSX
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function exportToExcel(Request $request): JsonResponse
     {
         try {
-            // Obtener los filtros de la solicitud
-            $filters = [];
-
-            if ($request->has('tour_id')) {
-                $filters['tour_id'] = $request->input('tour_id');
-            }
-
-            if ($request->has('status')) {
-                $filters['status'] = $request->input('status');
-            }
-
-            if ($request->has('date')) {
-                $filters['date'] = $request->input('date');
-            }
-
-            // Exportar a Excel
+            $filters = $this->extractFiltersFromRequest($request);
             $fileUrl = $this->reservationService->exportToExcel($filters);
 
             return response()->json([
@@ -246,6 +176,104 @@ class ReservationController extends Controller
                 'success' => false,
                 'message' => 'Error al generar el archivo Excel: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Extrae los filtros de la solicitud
+     */
+    private function extractFiltersFromRequest(Request $request): array
+    {
+        $filters = [];
+
+        if ($request->has('tour_id')) {
+            $filters['tour_id'] = $request->input('tour_id');
+        }
+
+        if ($request->has('status')) {
+            $filters['status'] = $request->input('status');
+        }
+
+        if ($request->has('date')) {
+            $filters['date'] = $request->input('date');
+        }
+
+        return $filters;
+    }
+
+    /**
+     * Envía notificaciones para una reserva marcada como pagada
+     */
+    private function sendNotificationsForPaidReservation($reservation): void
+    {
+        if (!$reservation->client) {
+            Log::warning('ReservationController::updateStatus - No se encontró cliente para la reserva');
+            return;
+        }
+
+        $datos = [
+            'nombre'  => $reservation->client->name,
+            'destino' => ($reservation->trip && $reservation->trip->tourTemplate)
+                       ? $reservation->trip->tourTemplate->name
+                       : 'N/A',
+            'fecha'   => ($reservation->trip && $reservation->trip->departure_date)
+                      ? $reservation->trip->departure_date
+                      : $reservation->date,
+        ];
+
+        $this->sendEmailNotification($reservation->client, $datos);
+        // Comentado como estaba en el original
+        /* $this->sendWhatsAppNotification($reservation->client, $datos); */
+    }
+
+    /**
+     * Envía notificación por correo electrónico
+     */
+    private function sendEmailNotification($client, array $datos): void
+    {
+        if (!$client->email) {
+            return;
+        }
+
+        Log::info('ReservationController::updateStatus - Enviando correo', [
+            'email' => $client->email
+        ]);
+
+        try {
+            Mail::to($client->email)->send(new ConfirmacionReserva($datos));
+        } catch (\Exception $e) {
+            Log::error('Error al enviar correo: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Envía notificación por WhatsApp
+     */
+    private function sendWhatsAppNotification($client, array $datos): void
+    {
+        if (!$client->phone) {
+            Log::info('ReservationController::updateStatus - No se envía WhatsApp: sin teléfono');
+            return;
+        }
+
+        Log::info('ReservationController::updateStatus - Enviando WhatsApp', [
+            'phone' => $client->phone
+        ]);
+
+        try {
+            $whatsappResult = $this->whatsAppService->sendPaymentConfirmation(
+                $client->phone,
+                $datos
+            );
+
+            Log::info('ReservationController::updateStatus - Resultado WhatsApp', [
+                'success' => $whatsappResult
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error al enviar WhatsApp: ' . $e->getMessage(), [
+                'exception' => get_class($e),
+                'trace' => $e->getTraceAsString()
+            ]);
         }
     }
 }
