@@ -84,10 +84,7 @@ class ReservationService
                 isset($data['payment']['receipt']) &&
                 $data['payment']['receipt'] instanceof UploadedFile
             ) {
-                $path = $data['payment']['receipt']->store('payments', [
-                    'disk' => 's3',
-                    'visibility' => 'public'
-                ]);
+                $path = $data['payment']['receipt']->store('payments', 'public');
                 $data['payment']['receipt'] = $path;
             }
 
@@ -162,14 +159,11 @@ class ReservationService
                 if (isset($data['payment']['receipt']) && $data['payment']['receipt'] instanceof UploadedFile) {
                     // Eliminar archivo anterior si existe
                     if ($reservation->payment->receipt) {
-                        Storage::disk('s3')->delete($reservation->payment->receipt);
+                        Storage::disk('public')->delete($reservation->payment->receipt);
                     }
 
                     // Almacenar nuevo archivo
-                    $path = $data['payment']['receipt']->store('payments', [
-                        'disk' => 's3',
-                        'visibility' => 'public'
-                    ]);
+                    $path = $data['payment']['receipt']->store('payments', 'public');
 
                     // Actualizar la ruta del archivo
                     $data['payment']['receipt'] = $path;
@@ -234,31 +228,21 @@ class ReservationService
             throw new \Exception('Error al generar el archivo Excel');
         }
 
-        // Generar nombre único para el archivo en S3
+        // Generar nombre único para el archivo
         $fileName = 'reservas_' . Carbon::now()->format('Y-m-d_His') . '.xlsx';
-        $s3Path = 'exports/' . $fileName;
+        $localPath = 'exports/' . $fileName;
 
-        // Subir el archivo al bucket S3
+        // Subir el archivo al almacenamiento local
         $fileContents = file_get_contents($filePath);
-        Storage::disk('s3')->put($s3Path, $fileContents, [
-            'visibility' => 'public',
+        Storage::disk('public')->put($localPath, $fileContents, [
             'ContentType' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         ]);
 
         // Eliminar el archivo temporal
         @unlink($filePath);
 
-        // Usar la URL configurada en .env para acceder al archivo
-        $baseUrl = rtrim(config('filesystems.disks.s3.url'), '/');
-
-        // Comprobar si la URL base está disponible en la configuración
-        if (empty($baseUrl)) {
-            // Usar la URL del endpoint como alternativa
-            $baseUrl = rtrim(config('filesystems.disks.s3.endpoint'), '/');
-        }
-
-        // Construir la URL completa
-        $url = $baseUrl . '/' . $s3Path;
+        // Generar URL para acceder al archivo
+        $url = url('storage/' . $localPath);
 
         return $url;
     }

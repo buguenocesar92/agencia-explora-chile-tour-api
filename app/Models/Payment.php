@@ -20,7 +20,7 @@ class Payment extends Model
     public function getReceiptUrlAttribute()
     {
         return $this->receipt
-            ? Storage::disk('s3')->url($this->receipt)
+            ? url('storage/' . $this->receipt)
             : null;
     }
 }
