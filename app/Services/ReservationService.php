@@ -232,18 +232,32 @@ class ReservationService
         $fileName = 'reservas_' . Carbon::now()->format('Y-m-d_His') . '.xlsx';
         $localPath = 'exports/' . $fileName;
 
-        // Subir el archivo al almacenamiento local
-        $fileContents = file_get_contents($filePath);
-        Storage::disk('public')->put($localPath, $fileContents, [
-            'ContentType' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        ]);
+        // Asegurarse de que la carpeta de destino exista
+        $exportDir = public_path('storage_files/exports');
+        if (!file_exists($exportDir)) {
+            if (!mkdir($exportDir, 0755, true)) {
+                throw new \Exception('No se pudo crear el directorio de exportación');
+            }
+        }
 
-        // Eliminar el archivo temporal
-        @unlink($filePath);
+        // Verificar permisos de escritura
+        if (!is_writable($exportDir)) {
+            chmod($exportDir, 0755);
+        }
 
-        // Generar URL para acceder al archivo
-        $url = url('storage_files/' . $localPath);
+        try {
+            // Usar copy directo en lugar de Storage para mayor control
+            copy($filePath, public_path('storage_files/' . $localPath));
 
-        return $url;
+            // Eliminar el archivo temporal
+            @unlink($filePath);
+
+            // Generar URL para acceder al archivo
+            $url = url('storage_files/' . $localPath);
+
+            return $url;
+        } catch (\Exception $e) {
+            throw new \Exception('Error al guardar el archivo: ' . $e->getMessage());
+        }
     }
 }
