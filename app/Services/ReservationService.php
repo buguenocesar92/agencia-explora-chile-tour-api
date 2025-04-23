@@ -242,7 +242,7 @@ class ReservationService
         @unlink($filePath);
 
         // Generar URL para acceder al archivo
-        $url = url('storage/' . $localPath);
+        $url = url('storage_files/' . $localPath);
 
         return $url;
     }

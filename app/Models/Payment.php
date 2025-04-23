@@ -20,7 +20,7 @@ class Payment extends Model
     public function getReceiptUrlAttribute()
     {
         return $this->receipt
-            ? url('storage/' . $this->receipt)
+            ? url('storage_files/' . $this->receipt)
             : null;
     }
 }
