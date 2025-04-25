@@ -3,7 +3,7 @@
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Confirmación de Reserva - Viajes Increíbles</title>
+  <title>Confirmación de Reserva - Explora Chiletour</title>
   <style type="text/css">
     /* Estilos base */
     body {
@@ -154,7 +154,7 @@
                             </td>
                             <td width="10"></td>
                             <td style="color:#0d9488; font-family:Arial, sans-serif; font-size:22px; font-weight:bold;">
-                              Viajes Increíbles
+                                Explora Chiletour
                             </td>
                           </tr>
                         </table>
@@ -186,7 +186,7 @@
                               ¡Tu reserva ha sido confirmada!
                             </p>
                             <p style="color:#ffffff; font-family:Arial, sans-serif; font-size:16px; margin:0;">
-                              Prepárate para vivir una experiencia inolvidable
+                                TU MEJOR VIAJE COMIENZA AQUÍ
                             </p>
                           </td>
                         </tr>
@@ -207,7 +207,7 @@
                 <table width="100%" border="0" cellpadding="0" cellspacing="0">
                   <tr>
                     <td style="padding:0 0 20px 0; font-family:Arial, sans-serif; font-size:16px; line-height:1.5; color:#4a4a4a;">
-                      <p style="margin:0 0 15px 0;">Gracias por elegir <strong>Viajes Increíbles</strong> para tu próxima aventura. Estamos emocionados de acompañarte en este viaje.</p>
+                      <p style="margin:0 0 15px 0;">Gracias por elegir <strong>Explora Chiletour</strong> para tu próxima aventura. Estamos emocionados de acompañarte en este viaje.</p>
 
                       <p style="margin:0 0 25px 0;">Hemos recibido tu reserva y todos los detalles están confirmados. A continuación encontrarás un resumen de tu viaje:</p>
                     </td>
@@ -263,7 +263,7 @@
                   </tr>
  --}}
                   <!-- Información Adicional -->
-                  <tr>
+{{--                   <tr>
                     <td style="padding:20px 0 0 0;">
                       <table width="100%" border="0" cellpadding="0" cellspacing="0">
                         <tr>
@@ -294,12 +294,12 @@
                         </tr>
                       </table>
                     </td>
-                  </tr>
+                  </tr> --}}
 
                   <!-- Mensaje Final -->
                   <tr>
                     <td style="padding:20px 0 0 0; font-family:Arial, sans-serif; font-size:16px; line-height:1.5; color:#4a4a4a;">
-                      <p style="margin:0 0 15px 0;">Si tienes alguna pregunta sobre tu reserva, no dudes en contactar a nuestro equipo de atención al cliente respondiendo a este correo o llamando al <strong>+34 900 123 456</strong>.</p>
+                      <p style="margin:0 0 15px 0;">Si tienes alguna pregunta sobre tu reserva, no dudes en contactar a nuestro equipo de atención al cliente respondiendo a este correo o llamando al <strong>+56 9 6216 3788</strong>.</p>
 
                       <p style="margin:0;">¡Esperamos que disfrutes de tu viaje!</p>
                     </td>
@@ -309,7 +309,7 @@
             </tr>
 
             <!-- Footer -->
-            <tr>
+{{--             <tr>
               <td class="footer" bgcolor="#f4f9fb">
                 <table width="100%" border="0" cellpadding="0" cellspacing="0">
                   <!-- Iconos Sociales -->
@@ -360,7 +360,7 @@
                   </tr>
                 </table>
               </td>
-            </tr>
+            </tr> --}}
           </table>
         </td>
       </tr>
