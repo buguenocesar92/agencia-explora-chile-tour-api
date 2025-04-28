@@ -9,7 +9,7 @@ use App\Models\Payment;
 class UpdateFileVisibility extends Command
 {
     protected $signature = 'files:update-visibility';
-    protected $description = 'Update visibility of existing files in S3 bucket to public';
+    protected $description = 'Update visibility of existing files in local storage to public';
 
     public function handle()
     {
@@ -20,8 +20,10 @@ class UpdateFileVisibility extends Command
 
         $count = 0;
         foreach ($payments as $payment) {
-            if (Storage::disk('s3')->exists($payment->receipt)) {
-                Storage::disk('s3')->setVisibility($payment->receipt, 'public');
+            if (Storage::disk('public')->exists($payment->receipt)) {
+                // Esta operación puede no ser necesaria para archivos locales,
+                // pero la mantenemos por consistencia
+                Storage::disk('public')->setVisibility($payment->receipt, 'public');
                 $this->line("Updated visibility for: {$payment->receipt}");
                 $count++;
             }

@@ -22,7 +22,7 @@ class PaymentObserver
         // Pero podemos manejar la eliminación del archivo de recibo si existe
         if ($payment->receipt) {
             try {
-                Storage::disk('s3')->delete($payment->receipt);
+                Storage::disk('public')->delete($payment->receipt);
                 Log::info('PaymentObserver: receipt file deleted', ['path' => $payment->receipt]);
             } catch (\Exception $e) {
                 Log::error('PaymentObserver: Error deleting receipt file', [
@@ -58,7 +58,7 @@ class PaymentObserver
         // Eliminar el archivo de recibo permanentemente si existe
         if ($payment->receipt) {
             try {
-                Storage::disk('s3')->delete($payment->receipt);
+                Storage::disk('public')->delete($payment->receipt);
                 Log::info('PaymentObserver: receipt file permanently deleted', ['path' => $payment->receipt]);
             } catch (\Exception $e) {
                 Log::error('PaymentObserver: Error permanently deleting receipt file', [
