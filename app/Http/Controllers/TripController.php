@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Trip;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class TripController extends Controller
 {
@@ -37,10 +38,23 @@ class TripController extends Controller
             'tour_template_id' => 'required|integer|exists:tour_templates,id',
             'departure_date'   => 'required|date',
             'return_date'      => 'required|date|after_or_equal:departure_date',
-            // Si en el futuro agregas otros campos (precio, capacidad, etc.), puedes incluirlos aquí.
+            'pdf_file'         => 'nullable|file|mimes:pdf|max:10240', // PDF de hasta 10MB
         ]);
 
-        $trip = Trip::create($data);
+        // Extraer los campos básicos para el Trip
+        $tripData = [
+            'tour_template_id' => $data['tour_template_id'],
+            'departure_date'   => $data['departure_date'],
+            'return_date'      => $data['return_date'],
+        ];
+
+        // Procesar el archivo del programa si se proporcionó
+        if ($request->hasFile('pdf_file') && $request->file('pdf_file')->isValid()) {
+            $programaPath = $request->file('pdf_file')->store('programas', 'public');
+            $tripData['programa'] = $programaPath;
+        }
+
+        $trip = Trip::create($tripData);
 
         return response()->json([
             'message' => 'Trip creado correctamente',
@@ -70,9 +84,36 @@ class TripController extends Controller
             'tour_template_id' => 'sometimes|required|integer|exists:tour_templates,id',
             'departure_date'   => 'sometimes|required|date',
             'return_date'      => 'sometimes|required|date|after_or_equal:departure_date',
+            'pdf_file'         => 'nullable|file|mimes:pdf|max:10240', // PDF de hasta 10MB
         ]);
 
-        $trip->update($data);
+        // Extraer los campos a actualizar
+        $tripData = [];
+
+        if (isset($data['tour_template_id'])) {
+            $tripData['tour_template_id'] = $data['tour_template_id'];
+        }
+
+        if (isset($data['departure_date'])) {
+            $tripData['departure_date'] = $data['departure_date'];
+        }
+
+        if (isset($data['return_date'])) {
+            $tripData['return_date'] = $data['return_date'];
+        }
+
+        // Procesar el archivo del programa si se proporcionó
+        if ($request->hasFile('pdf_file') && $request->file('pdf_file')->isValid()) {
+            // Eliminar el archivo anterior si existe
+            if ($trip->programa && Storage::disk('public')->exists($trip->programa)) {
+                Storage::disk('public')->delete($trip->programa);
+            }
+
+            $programaPath = $request->file('pdf_file')->store('programas', 'public');
+            $tripData['programa'] = $programaPath;
+        }
+
+        $trip->update($tripData);
 
         return response()->json([
             'message' => 'Trip actualizado correctamente',
@@ -86,10 +127,65 @@ class TripController extends Controller
     public function destroy($id)
     {
         $trip = Trip::findOrFail($id);
+
+        // Eliminar el archivo de programa asociado si existe
+        if ($trip->programa && Storage::disk('public')->exists($trip->programa)) {
+            Storage::disk('public')->delete($trip->programa);
+        }
+
         $trip->delete();
 
         return response()->json([
             'message' => 'Trip eliminado correctamente',
+        ]);
+    }
+
+    /**
+     * Devuelve el archivo PDF del programa del trip.
+     */
+    public function getProgramaFile($id)
+    {
+        $trip = Trip::findOrFail($id);
+
+        if (!$trip->programa) {
+            return response()->json([
+                'message' => 'Este trip no tiene un programa asociado.',
+            ], 404);
+        }
+
+        if (!Storage::disk('public')->exists($trip->programa)) {
+            return response()->json([
+                'message' => 'El archivo del programa no existe.',
+            ], 404);
+        }
+
+        // Devuelve la URL pública del archivo
+        $fileUrl = Storage::url($trip->programa);
+
+        return response()->json([
+            'file_url' => $fileUrl,
+            'file_name' => basename($trip->programa),
+        ]);
+    }
+
+    /**
+     * Descarga el archivo PDF del programa del trip.
+     */
+    public function downloadProgramaFile($id)
+    {
+        $trip = Trip::findOrFail($id);
+
+        if (!$trip->programa || !Storage::disk('public')->exists($trip->programa)) {
+            return response()->json([
+                'message' => 'El archivo del programa no existe.',
+            ], 404);
+        }
+
+        $path = Storage::disk('public')->path($trip->programa);
+        $filename = basename($trip->programa);
+
+        return response()->download($path, 'programa_viaje.pdf', [
+            'Content-Type' => 'application/pdf'
         ]);
     }
 }

@@ -12,4 +12,8 @@ Route::group([
     Route::get('/{id}', [TripController::class, 'show']);
     Route::put('/{id}', [TripController::class, 'update']);
     Route::delete('/{id}', [TripController::class, 'destroy']);
+
+    // Rutas para el archivo de programa
+    Route::get('/{id}/programa', [TripController::class, 'getProgramaFile']);
+    Route::get('/{id}/programa/download', [TripController::class, 'downloadProgramaFile']);
 });

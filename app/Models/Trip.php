@@ -14,6 +14,7 @@ class Trip extends Model
         'tour_template_id',
         'departure_date',
         'return_date',
+        'programa',
 /*         'price',
         'capacity' */
     ];
