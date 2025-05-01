@@ -13,6 +13,11 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 use App\Services\WhatsAppService;
 
+/**
+ * Controlador para gestionar las reservas
+ *
+ * @package App\Http\Controllers
+ */
 class ReservationController extends Controller
 {
     private ReservationService $reservationService;
@@ -26,6 +31,9 @@ class ReservationController extends Controller
 
     /**
      * Lista todas las reservas con filtros opcionales
+     *
+     * @param Request $request
+     * @return JsonResponse
      */
     public function index(Request $request): JsonResponse
     {
@@ -36,17 +44,18 @@ class ReservationController extends Controller
             $request->boolean('with_trashed', false)
         );
 
-        return response()->json([
-            'reservations' => $reservations,
-        ]);
+        return response()->json(['reservations' => $reservations]);
     }
 
     /**
      * Crea una nueva reserva
+     *
+     * @param StoreReservationRequest $request
+     * @return JsonResponse
      */
     public function store(StoreReservationRequest $request): JsonResponse
     {
-        $reservation = $this->reservationService->createReservation($request->all());
+        $reservation = $this->reservationService->createReservation($request->validated());
 
         return response()->json([
             'message'     => 'Reserva completada correctamente',
@@ -56,12 +65,15 @@ class ReservationController extends Controller
 
     /**
      * Actualiza el estado de una reserva
+     *
+     * @param UpdateReservationStatusRequest $request
+     * @param int $id
+     * @return JsonResponse
      */
     public function updateStatus(UpdateReservationStatusRequest $request, int $id): JsonResponse
     {
         $status = $request->input('status', 'paid');
 
-        // Añadir debug para ver los datos recibidos
         Log::info('ReservationController::updateStatus - Iniciando actualización', [
             'id' => $id,
             'status' => $status
@@ -69,49 +81,41 @@ class ReservationController extends Controller
 
         $reservation = $this->reservationService->updateReservationStatus($id, $status);
 
-        // Cargar relaciones necesarias: client, trip, y tourTemplate
-        $reservation->load('client', 'trip.tourTemplate');
-
-        Log::info('ReservationController::updateStatus - Reserva cargada', [
-            'reservation_id' => $reservation->id,
-            'client' => $reservation->client ? true : false,
-            'trip' => $reservation->trip ? true : false,
-            'tourTemplate' => ($reservation->trip && $reservation->trip->tourTemplate) ? true : false,
-            'client_phone' => $reservation->client ? $reservation->client->phone : null
-        ]);
-
         // Si la reserva fue marcada como pagada, enviar notificaciones
         if ($status === 'paid') {
-            $this->sendNotificationsForPaidReservation($reservation);
-        } else {
-            Log::info('ReservationController::updateStatus - No se envían notificaciones: estado no es "paid"');
+            $this->reservationService->sendNotificationsForPaidReservation($reservation);
         }
 
         return response()->json([
-            'message'     => 'Reserva actualizada correctamente',
+            'message'     => 'Estado de reserva actualizado correctamente',
             'reservation' => $reservation,
         ]);
     }
 
     /**
      * Muestra una reserva específica
+     *
+     * @param int $id
+     * @return JsonResponse
      */
     public function show(int $id): JsonResponse
     {
         $withTrashed = request()->boolean('with_trashed', false);
         $reservation = $this->reservationService->getReservation($id, $withTrashed);
 
-        return response()->json([
-            'reservation' => $reservation,
-        ]);
+        return response()->json(['reservation' => $reservation]);
     }
 
     /**
      * Actualiza una reserva
+     *
+     * @param UpdateReservationRequest $request
+     * @param int $id
+     * @return JsonResponse
      */
     public function update(UpdateReservationRequest $request, int $id): JsonResponse
     {
-        $reservation = $this->reservationService->updateReservation($id, $request->all());
+        $reservation = $this->reservationService->updateReservation($id, $request->validated());
 
         return response()->json([
             'message'     => 'Reserva actualizada correctamente',
@@ -121,42 +125,48 @@ class ReservationController extends Controller
 
     /**
      * Elimina lógicamente una reserva (soft delete)
+     *
+     * @param int $id
+     * @return JsonResponse
      */
     public function destroy(int $id): JsonResponse
     {
         $this->reservationService->deleteReservation($id);
 
-        return response()->json([
-            'message' => 'Reserva eliminada correctamente',
-        ]);
+        return response()->json(['message' => 'Reserva eliminada correctamente']);
     }
 
     /**
      * Restaura una reserva previamente eliminada
+     *
+     * @param int $id
+     * @return JsonResponse
      */
     public function restore(int $id): JsonResponse
     {
         $this->reservationService->restoreReservation($id);
 
-        return response()->json([
-            'message' => 'Reserva restaurada correctamente',
-        ]);
+        return response()->json(['message' => 'Reserva restaurada correctamente']);
     }
 
     /**
      * Elimina permanentemente una reserva
+     *
+     * @param int $id
+     * @return JsonResponse
      */
     public function forceDelete(int $id): JsonResponse
     {
         $this->reservationService->forceDeleteReservation($id);
 
-        return response()->json([
-            'message' => 'Reserva eliminada permanentemente',
-        ]);
+        return response()->json(['message' => 'Reserva eliminada permanentemente']);
     }
 
     /**
      * Exporta las reservas a formato XLSX
+     *
+     * @param Request $request
+     * @return JsonResponse
      */
     public function exportToExcel(Request $request): JsonResponse
     {
@@ -180,22 +190,38 @@ class ReservationController extends Controller
     }
 
     /**
+     * Marca una reserva como pagada
+     *
+     * @param int $id
+     * @return JsonResponse
+     */
+    public function markAsPaid(int $id): JsonResponse
+    {
+        $reservation = $this->reservationService->updateReservationStatus($id, 'paid');
+
+        $this->reservationService->sendNotificationsForPaidReservation($reservation);
+
+        return response()->json([
+            'message'     => 'Reserva marcada como pagada correctamente',
+            'reservation' => $reservation,
+        ]);
+    }
+
+    /**
      * Extrae los filtros de la solicitud
+     *
+     * @param Request $request
+     * @return array
      */
     private function extractFiltersFromRequest(Request $request): array
     {
         $filters = [];
+        $possibleFilters = ['tour_id', 'status', 'date', 'from_date', 'to_date', 'client_id'];
 
-        if ($request->has('tour_id')) {
-            $filters['tour_id'] = $request->input('tour_id');
-        }
-
-        if ($request->has('status')) {
-            $filters['status'] = $request->input('status');
-        }
-
-        if ($request->has('date')) {
-            $filters['date'] = $request->input('date');
+        foreach ($possibleFilters as $filter) {
+            if ($request->has($filter)) {
+                $filters[$filter] = $request->input($filter);
+            }
         }
 
         return $filters;

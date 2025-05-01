@@ -3,109 +3,106 @@
 namespace App\Exports;
 
 use App\Models\Reservation;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Collection;
+use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithMapping;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Facades\Excel;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Storage;
 
-class ReservationsExport
+/**
+ * Clase para exportar reservas a Excel
+ *
+ * @package App\Exports
+ */
+class ReservationsExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize
 {
-    protected $filters;
+    protected $reservations;
 
-    public function __construct(array $filters = [])
+    /**
+     * Constructor que recibe las reservas a exportar
+     *
+     * @param Collection $reservations
+     */
+    public function __construct(Collection $reservations)
     {
-        $this->filters = $filters;
+        $this->reservations = $reservations;
     }
 
     /**
-     * Exporta las reservas a un archivo XLSX
+     * Devuelve la colección de reservas
      *
-     * @return string Ruta temporal del archivo
+     * @return Collection
      */
-    public function export(): string
+    public function collection()
     {
-        // Crear una nueva instancia de Spreadsheet
-        $spreadsheet = new Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
+        return $this->reservations;
+    }
 
-        // Configurar los encabezados
-        $sheet->setCellValue('A1', 'ID');
-        $sheet->setCellValue('B1', 'Cliente');
-        $sheet->setCellValue('C1', 'RUT');
-        $sheet->setCellValue('D1', 'Email');
-        $sheet->setCellValue('E1', 'Teléfono');
-        $sheet->setCellValue('F1', 'Destino/Tour');
-        $sheet->setCellValue('G1', 'Fecha');
-        $sheet->setCellValue('H1', 'Estado');
-        $sheet->setCellValue('I1', 'Comprobante de Pago');
+    /**
+     * Define los encabezados del archivo Excel
+     *
+     * @return array
+     */
+    public function headings(): array
+    {
+        return [
+            'ID',
+            'Cliente',
+            'RUT',
+            'Email',
+            'Teléfono',
+            'Destino/Tour',
+            'Fecha',
+            'Estado',
+            'Método de Pago',
+            'Monto',
+            'Comprobante'
+        ];
+    }
 
-        // Consultar las reservas con sus relaciones
-        $query = Reservation::with(['client', 'trip.tourTemplate', 'payment']);
+    /**
+     * Mapea los datos de cada reserva
+     *
+     * @param mixed $reservation
+     * @return array
+     */
+    public function map($reservation): array
+    {
+        $status = match($reservation->status) {
+            'paid' => 'Pagado',
+            'pending' => 'Pendiente',
+            'cancelled' => 'Cancelado',
+            default => $reservation->status
+        };
 
-        // Aplicar filtros si existen
-        if (isset($this->filters['tour_id'])) {
-            $query->where('trip_id', $this->filters['tour_id']);
-        }
+        return [
+            'id' => $reservation->id,
+            'cliente' => $reservation->client->name ?? 'N/A',
+            'rut' => $reservation->client->rut ?? 'N/A',
+            'email' => $reservation->client->email ?? 'N/A',
+            'telefono' => $reservation->client->phone ?? 'N/A',
+            'destino' => $reservation->trip->tourTemplate->name ?? 'N/A',
+            'fecha' => optional($reservation->trip)->date ?? $reservation->date,
+            'estado' => $status,
+            'metodo_pago' => $reservation->payment->payment_method ?? 'N/A',
+            'monto' => $reservation->payment->amount ?? 'N/A',
+            'comprobante' => $reservation->payment->receipt
+                ? url('storage/' . $reservation->payment->receipt)
+                : 'No disponible'
+        ];
+    }
 
-        if (isset($this->filters['status'])) {
-            $query->where('status', $this->filters['status']);
-        }
-
-        if (isset($this->filters['date'])) {
-            $query->whereDate('date', $this->filters['date']);
-        }
-
-        $reservations = $query->get();
-
-        // Llenar datos
-        $row = 2;
-        foreach ($reservations as $reservation) {
-            $sheet->setCellValue('A' . $row, $reservation->id);
-            $sheet->setCellValue('B' . $row, $reservation->client->name ?? 'N/A');
-            $sheet->setCellValue('C' . $row, $reservation->client->rut ?? 'N/A');
-            $sheet->setCellValue('D' . $row, $reservation->client->email ?? 'N/A');
-            $sheet->setCellValue('E' . $row, $reservation->client->phone ?? 'N/A');
-            $sheet->setCellValue('F' . $row, $reservation->trip->tourTemplate->name ?? 'N/A');
-            $sheet->setCellValue('G' . $row, $reservation->trip->departure_date ?? $reservation->date);
-
-            // Cambiar la visualización del estado
-            $status = $reservation->status === 'paid' ? 'Pagado' : 'No pagado';
-            $sheet->setCellValue('H' . $row, $status);
-
-            // Agregar URL del comprobante de pago
-            $receiptUrl = 'N/A';
-            if ($reservation->payment && $reservation->payment->receipt) {
-                // Construir la URL del comprobante de pago en S3
-                $baseUrl = rtrim(config('filesystems.disks.s3.url'), '/');
-                if (empty($baseUrl)) {
-                    $baseUrl = rtrim(config('filesystems.disks.s3.endpoint'), '/');
-                }
-                $receiptUrl = $baseUrl . '/' . $reservation->payment->receipt;
-            }
-            $sheet->setCellValue('I' . $row, $receiptUrl);
-
-            $row++;
-        }
-
-        // Autoajustar columnas
-        foreach (range('A', 'I') as $column) {
-            $sheet->getColumnDimension($column)->setAutoSize(true);
-        }
-
-        // Crear un archivo temporal para guardar el XLSX
-        $fileName = 'reservas_' . Carbon::now()->format('Y-m-d_His') . '.xlsx';
-        $tempPath = storage_path('app/public/temp/' . $fileName);
-
-        // Asegurarse de que el directorio exista
-        if (!file_exists(dirname($tempPath))) {
-            mkdir(dirname($tempPath), 0755, true);
-        }
-
-        // Guardar el archivo
-        $writer = new Xlsx($spreadsheet);
-        $writer->save($tempPath);
-
-        return $tempPath;
+    /**
+     * Almacena el archivo Excel en el disco especificado
+     *
+     * @param string $fileName
+     * @param string $disk
+     * @return void
+     */
+    public function store(string $fileName, string $disk = 'public'): void
+    {
+        Excel::store($this, $fileName, $disk);
     }
 }
