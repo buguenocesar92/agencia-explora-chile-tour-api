@@ -4,10 +4,19 @@ namespace App\Repositories;
 
 use App\Models\Client;
 use App\Repositories\Contracts\ClientRepositoryInterface;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class ClientRepository implements ClientRepositoryInterface
 {
-    public function getAll(?string $search = null, bool $withTrashed = false)
+    /**
+     * Obtiene todos los clientes, opcionalmente filtrados por búsqueda
+     *
+     * @param string|null $search Término de búsqueda
+     * @param bool $withTrashed Incluir clientes eliminados
+     * @return Collection
+     */
+    public function getAll(?string $search = null, bool $withTrashed = false): Collection
     {
         $query = Client::query();
 
@@ -21,31 +30,61 @@ class ClientRepository implements ClientRepositoryInterface
             // Limpiar el formato del RUT para comparación (quitar puntos y guiones)
             $cleanSearch = preg_replace('/[.-]/', '', $search);
 
-            $query->where('name', 'ilike', "%$search%")
-                  // Buscar coincidencia exacta de RUT limpio
+            $query->where(function ($q) use ($search, $cleanSearch) {
+                $q->where('name', 'ilike', "%$search%")
+                  ->orWhere('email', 'ilike', "%$search%")
+                  // Buscar en RUT limpio
                   ->orWhereRaw("REPLACE(REPLACE(rut, '.', ''), '-', '') ILIKE ?", ["%$cleanSearch%"]);
+            });
         }
 
         return $query->orderBy('name')->get();
     }
 
-    public function findById(int $id)
+    /**
+     * Encuentra un cliente por su ID
+     *
+     * @param int $id
+     * @return Client
+     * @throws ModelNotFoundException
+     */
+    public function findById(int $id): Client
     {
         return Client::findOrFail($id);
     }
 
-    public function create(array $data)
+    /**
+     * Crea un nuevo cliente
+     *
+     * @param array $data
+     * @return Client
+     */
+    public function create(array $data): Client
     {
         return Client::create($data);
     }
 
-    public function update(int $id, array $data)
+    /**
+     * Actualiza un cliente existente
+     *
+     * @param int $id
+     * @param array $data
+     * @return Client
+     * @throws ModelNotFoundException
+     */
+    public function update(int $id, array $data): Client
     {
         $client = Client::findOrFail($id);
         $client->update($data);
-        return $client;
+        return $client->fresh();
     }
 
+    /**
+     * Elimina un cliente (soft delete)
+     *
+     * @param int $id
+     * @throws ModelNotFoundException
+     */
     public function delete(int $id): void
     {
         $client = Client::findOrFail($id);
@@ -54,28 +93,36 @@ class ClientRepository implements ClientRepositoryInterface
 
     /**
      * Restaura un cliente eliminado
+     *
+     * @param int $id
+     * @throws ModelNotFoundException
      */
     public function restore(int $id): void
     {
-        Client::withTrashed()->findOrFail($id)->restore();
+        $client = Client::withTrashed()->findOrFail($id);
+        $client->restore();
     }
 
     /**
      * Elimina permanentemente un cliente
+     *
+     * @param int $id
+     * @throws ModelNotFoundException
      */
     public function forceDelete(int $id): void
     {
-        Client::withTrashed()->findOrFail($id)->forceDelete();
+        $client = Client::withTrashed()->findOrFail($id);
+        $client->forceDelete();
     }
 
     /**
-     * Busca un cliente por su RUT normalizado (sin puntos ni guiones)
+     * Busca un cliente por su RUT normalizado
      *
-     * @param string $normalizedRut
-     * @param bool $withTrashed Si es true, incluye clientes con soft delete
-     * @return \App\Models\Client|null
+     * @param string $normalizedRut RUT sin puntos ni guiones
+     * @param bool $withTrashed Incluir clientes eliminados
+     * @return Client|null
      */
-    public function findByRut(string $normalizedRut, bool $withTrashed = false)
+    public function findByRut(string $normalizedRut, bool $withTrashed = false): ?Client
     {
         $query = Client::query();
 

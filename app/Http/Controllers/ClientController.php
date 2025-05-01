@@ -7,7 +7,11 @@ use App\Http\Requests\Client\UpdateClientRequest;
 use App\Services\ClientService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
+/**
+ * Controlador para gestionar clientes
+ */
 class ClientController extends Controller
 {
     private ClientService $clientService;
@@ -17,66 +21,31 @@ class ClientController extends Controller
         $this->clientService = $clientService;
     }
 
+    /**
+     * Lista todos los clientes con búsqueda opcional
+     */
     public function index(Request $request): JsonResponse
     {
         $search = $request->input('search');
         $withTrashed = $request->boolean('with_trashed', false);
+
         $clients = $this->clientService->getAll($search, $withTrashed);
+
         return response()->json($clients);
     }
 
+    /**
+     * Muestra un cliente específico
+     */
     public function show(int $id): JsonResponse
     {
         $client = $this->clientService->findById($id);
+
         return response()->json($client);
     }
 
-    public function store(StoreClientRequest $request): JsonResponse
-    {
-        $validatedData = $request->validated();
-
-        // Normalizar el RUT para la búsqueda
-        $normalizedRut = preg_replace('/[.-]/', '', $validatedData['rut']);
-
-        // Buscar si existe un cliente con este RUT (incluyendo soft deleted)
-        $existingClient = $this->clientService->findByRut($normalizedRut, true);
-
-        if ($existingClient && $existingClient->trashed()) {
-            // Si existe y está eliminado, lo restauramos y actualizamos
-            $this->clientService->restore($existingClient->id);
-            $client = $this->clientService->update($existingClient->id, $validatedData);
-
-            return response()->json([
-                'message' => 'Cliente restaurado y actualizado con éxito.',
-                'client' => $client
-            ], 200);
-        }
-
-        // Si no existe o no está eliminado, creamos uno nuevo
-        $client = $this->clientService->create($validatedData);
-        return response()->json([
-            'message' => 'Cliente creado con éxito.',
-            'client' => $client
-        ], 201);
-    }
-
-    public function update(UpdateClientRequest $request, int $id): JsonResponse
-    {
-        $client = $this->clientService->update($id, $request->validated());
-        return response()->json([
-            'message' => 'Cliente actualizado con éxito.',
-            'client' => $client
-        ]);
-    }
-
-    public function destroy(int $id): JsonResponse
-    {
-        $this->clientService->delete($id);
-        return response()->json(['message' => 'Cliente eliminado con éxito.']);
-    }
-
     /**
-     * Busca un cliente por su RUT (endpoint público)
+     * Busca un cliente por su RUT
      */
     public function findByRut(Request $request): JsonResponse
     {
@@ -87,35 +56,141 @@ class ClientController extends Controller
             return response()->json(['message' => 'El parámetro RUT es requerido'], 400);
         }
 
-        // Normalizar el RUT (eliminar puntos y guiones)
-        $normalizedRut = preg_replace('/[.-]/', '', $rut);
+        $client = $this->clientService->findByRut($rut, $withTrashed);
 
-        // Buscar cliente por RUT normalizado
-        $client = $this->clientService->findByRut($normalizedRut, $withTrashed);
-
-        if ($client) {
-            return response()->json($client);
+        if (!$client) {
+            return response()->json(['message' => 'No se encontró ningún cliente con el RUT proporcionado'], 404);
         }
 
-        // Devolver 404 cuando no se encuentra el cliente
-        return response()->json(['message' => 'No se encontró ningún cliente con el RUT proporcionado'], 404);
+        return response()->json($client);
     }
 
     /**
-     * Restaura un cliente que ha sido eliminado con soft delete.
+     * Crea un nuevo cliente
+     */
+    public function store(StoreClientRequest $request): JsonResponse
+    {
+        $validatedData = $request->validated();
+
+        try {
+            $client = $this->clientService->create($validatedData);
+
+            return response()->json([
+                'message' => 'Cliente creado con éxito.',
+                'client' => $client
+            ], 201);
+        } catch (\Exception $e) {
+            Log::error('Error al crear cliente', [
+                'error' => $e->getMessage(),
+                'data' => $validatedData
+            ]);
+
+            return response()->json([
+                'message' => 'No se pudo crear el cliente. ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Actualiza un cliente existente
+     */
+    public function update(UpdateClientRequest $request, int $id): JsonResponse
+    {
+        try {
+            $client = $this->clientService->update($id, $request->validated());
+
+            return response()->json([
+                'message' => 'Cliente actualizado con éxito.',
+                'client' => $client
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error al actualizar cliente', [
+                'id' => $id,
+                'error' => $e->getMessage()
+            ]);
+
+            if ($e instanceof \Illuminate\Database\Eloquent\ModelNotFoundException) {
+                return response()->json(['message' => 'Cliente no encontrado'], 404);
+            }
+
+            return response()->json([
+                'message' => 'No se pudo actualizar el cliente. ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Elimina un cliente (soft delete)
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        try {
+            $this->clientService->delete($id);
+
+            return response()->json(['message' => 'Cliente eliminado con éxito.']);
+        } catch (\Exception $e) {
+            Log::error('Error al eliminar cliente', [
+                'id' => $id,
+                'error' => $e->getMessage()
+            ]);
+
+            if ($e instanceof \Illuminate\Database\Eloquent\ModelNotFoundException) {
+                return response()->json(['message' => 'Cliente no encontrado'], 404);
+            }
+
+            return response()->json([
+                'message' => 'No se pudo eliminar el cliente. ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Restaura un cliente eliminado
      */
     public function restore(int $id): JsonResponse
     {
-        $this->clientService->restore($id);
-        return response()->json(['message' => 'Cliente restaurado con éxito.']);
+        try {
+            $this->clientService->restore($id);
+
+            return response()->json(['message' => 'Cliente restaurado con éxito.']);
+        } catch (\Exception $e) {
+            Log::error('Error al restaurar cliente', [
+                'id' => $id,
+                'error' => $e->getMessage()
+            ]);
+
+            if ($e instanceof \Illuminate\Database\Eloquent\ModelNotFoundException) {
+                return response()->json(['message' => 'Cliente no encontrado'], 404);
+            }
+
+            return response()->json([
+                'message' => 'No se pudo restaurar el cliente. ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
-     * Elimina permanentemente un cliente.
+     * Elimina permanentemente un cliente
      */
     public function forceDelete(int $id): JsonResponse
     {
-        $this->clientService->forceDelete($id);
-        return response()->json(['message' => 'Cliente eliminado permanentemente.']);
+        try {
+            $this->clientService->forceDelete($id);
+
+            return response()->json(['message' => 'Cliente eliminado permanentemente.']);
+        } catch (\Exception $e) {
+            Log::error('Error al eliminar permanentemente cliente', [
+                'id' => $id,
+                'error' => $e->getMessage()
+            ]);
+
+            if ($e instanceof \Illuminate\Database\Eloquent\ModelNotFoundException) {
+                return response()->json(['message' => 'Cliente no encontrado'], 404);
+            }
+
+            return response()->json([
+                'message' => 'No se pudo eliminar permanentemente el cliente. ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
