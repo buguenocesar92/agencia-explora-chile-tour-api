@@ -1,0 +1,128 @@
+name: CI/CD Workflow
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: agencia_test
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        extensions: mbstring, dom, fileinfo, mysql, pdo_mysql
+        coverage: xdebug
+    
+    - name: Create test .env file
+      run: |
+        echo "APP_NAME=AgenciaExploraTour" > .env
+        echo "APP_ENV=testing" >> .env
+        echo "APP_KEY=base64:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" >> .env
+        echo "APP_DEBUG=true" >> .env
+        echo "APP_URL=http://localhost" >> .env
+        echo "LOG_CHANNEL=stack" >> .env
+        echo "LOG_LEVEL=debug" >> .env
+        echo "DB_CONNECTION=mysql" >> .env
+        echo "DB_HOST=127.0.0.1" >> .env
+        echo "DB_PORT=3306" >> .env
+        echo "DB_DATABASE=agencia_test" >> .env
+        echo "DB_USERNAME=root" >> .env
+        echo "DB_PASSWORD=password" >> .env
+        echo "CACHE_DRIVER=array" >> .env
+        echo "SESSION_DRIVER=array" >> .env
+        echo "QUEUE_CONNECTION=sync" >> .env
+        echo "MAIL_MAILER=array" >> .env
+    
+    - name: Install Composer dependencies
+      run: composer install --prefer-dist --no-progress --no-suggest
+    
+    - name: Generate application key
+      run: php artisan key:generate
+    
+    - name: Configure Database
+      run: |
+        php artisan config:clear
+        php artisan migrate --force
+    
+    - name: Run tests
+      run: php artisan test
+  
+  deploy:
+    needs: tests
+    if: success() && github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        extensions: mbstring, dom, fileinfo, mysql
+    
+    - name: Install Composer dependencies
+      run: composer install --prefer-dist --no-progress --no-suggest --no-dev
+    
+    - name: Create production .env file
+      run: |
+        echo "APP_NAME=AgenciaExploraTour" > .env
+        echo "APP_ENV=production" >> .env
+        echo "APP_KEY=${{ secrets.APP_KEY }}" >> .env
+        echo "APP_DEBUG=false" >> .env
+        echo "APP_URL=${{ secrets.APP_URL }}" >> .env
+        echo "LOG_CHANNEL=stack" >> .env
+        echo "LOG_LEVEL=error" >> .env
+        echo "DB_CONNECTION=mysql" >> .env
+        echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env
+        echo "DB_PORT=3306" >> .env
+        echo "DB_DATABASE=${{ secrets.DB_DATABASE }}" >> .env
+        echo "DB_USERNAME=${{ secrets.DB_USERNAME }}" >> .env
+        echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+        echo "CACHE_DRIVER=file" >> .env
+        echo "SESSION_DRIVER=file" >> .env
+        echo "QUEUE_CONNECTION=sync" >> .env
+    
+    - name: Optimize for production
+      run: |
+        php artisan config:cache
+        php artisan route:cache
+        php artisan view:cache
+    
+    - name: Deploy to FTP
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        local-dir: ./
+        server-dir: ${{ secrets.FTP_SERVER_DIR }}/
+        exclude: |
+          **/.git*
+          **/.git*/**
+          **/node_modules/**
+          **/tests/**
+          **/storage/logs/**
+          **/storage/framework/cache/**
+          **/storage/framework/sessions/**
+          **/storage/framework/views/**
+          .env*
+          **.md
+          **.yml 
