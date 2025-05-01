@@ -124,6 +124,7 @@ jobs:
           **/.git*
           **/.git*/**
           **/node_modules/**
+          **/vendor/**
           **/tests/**
           **/storage/logs/**
           **/storage/framework/cache/**
