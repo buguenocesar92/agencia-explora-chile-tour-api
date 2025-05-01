@@ -65,9 +65,9 @@ jobs:
 
     - name: Run tests
       run: |
-        # Parche para el error de ILIKE en MySQL
-        sed -i 's/ilike/like/g' app/Repositories/ReservationRepository.php
-        sed -i 's/ILIKE/LIKE/g' app/Repositories/ReservationRepository.php
+        # Parche para el error de ILIKE en MySQL (reemplazo en todos los archivos relevantes)
+        find app -type f -name "*.php" -exec sed -i 's/ilike/like/g' {} \;
+        find app -type f -name "*.php" -exec sed -i 's/ILIKE/LIKE/g' {} \;
         php artisan test
 
   deploy:
