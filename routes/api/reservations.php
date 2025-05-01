@@ -2,7 +2,6 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ReservationController;
-use App\Services\WhatsAppService;
 use Illuminate\Support\Facades\Log;
 
 Route::group(['prefix' => 'reservations'], function () {
@@ -20,35 +19,4 @@ Route::group(['prefix' => 'reservations'], function () {
 
     // Ruta para exportar reservas a Excel
     Route::get('/export/excel', [ReservationController::class, 'exportToExcel'])->name('reservations.exportToExcel');
-
-    // Ruta de prueba para el servicio de WhatsApp
-    Route::get('/test/whatsapp/{phone}', function ($phone) {
-        try {
-            Log::info('Test WhatsApp - Inicio', ['phone' => $phone]);
-
-            $whatsAppService = app(WhatsAppService::class);
-            $result = $whatsAppService->sendPaymentConfirmation($phone, [
-                'nombre' => 'Cliente de Prueba',
-                'destino' => 'Isla de Pascua',
-                'fecha' => date('Y-m-d')
-            ]);
-
-            Log::info('Test WhatsApp - Resultado', ['success' => $result]);
-
-            return response()->json([
-                'success' => $result,
-                'message' => $result ? 'WhatsApp enviado correctamente' : 'Error al enviar WhatsApp'
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Test WhatsApp - Error', [
-                'exception' => get_class($e),
-                'message' => $e->getMessage()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    })->name('reservations.testWhatsApp');
 });

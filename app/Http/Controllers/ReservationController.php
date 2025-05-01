@@ -11,7 +11,6 @@ use App\Mail\ConfirmacionReserva;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
-use App\Services\WhatsAppService;
 
 /**
  * Controlador para gestionar las reservas
@@ -21,12 +20,10 @@ use App\Services\WhatsAppService;
 class ReservationController extends Controller
 {
     private ReservationService $reservationService;
-    private WhatsAppService $whatsAppService;
 
-    public function __construct(ReservationService $reservationService, WhatsAppService $whatsAppService)
+    public function __construct(ReservationService $reservationService)
     {
         $this->reservationService = $reservationService;
-        $this->whatsAppService = $whatsAppService;
     }
 
     /**
@@ -229,76 +226,25 @@ class ReservationController extends Controller
 
     /**
      * Envía notificaciones para una reserva marcada como pagada
-     */
-    private function sendNotificationsForPaidReservation($reservation): void
-    {
-        if (!$reservation->client) {
-            Log::warning('ReservationController::updateStatus - No se encontró cliente para la reserva');
-            return;
-        }
-
-        $datos = [
-            'nombre'  => $reservation->client->name,
-            'destino' => ($reservation->trip && $reservation->trip->tourTemplate)
-                       ? $reservation->trip->tourTemplate->name
-                       : 'N/A',
-            'fecha'   => ($reservation->trip && $reservation->trip->departure_date)
-                      ? $reservation->trip->departure_date
-                      : $reservation->date,
-        ];
-
-        $this->sendEmailNotification($reservation->client, $datos);
-        // Comentado como estaba en el original
-        /* $this->sendWhatsAppNotification($reservation->client, $datos); */
-    }
-
-    /**
-     * Envía notificación por correo electrónico
+     *
+     * @param Reservation $reservation
+     * @return void
      */
     private function sendEmailNotification($client, array $datos): void
     {
-        if (!$client->email) {
+        if (empty($client->email)) {
+            Log::info('ReservationController::updateStatus - No se envía email: sin dirección de correo');
             return;
         }
-
-        Log::info('ReservationController::updateStatus - Enviando correo', [
-            'email' => $client->email
-        ]);
 
         try {
             Mail::to($client->email)->send(new ConfirmacionReserva($datos));
-        } catch (\Exception $e) {
-            Log::error('Error al enviar correo: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Envía notificación por WhatsApp
-     */
-    private function sendWhatsAppNotification($client, array $datos): void
-    {
-        if (!$client->phone) {
-            Log::info('ReservationController::updateStatus - No se envía WhatsApp: sin teléfono');
-            return;
-        }
-
-        Log::info('ReservationController::updateStatus - Enviando WhatsApp', [
-            'phone' => $client->phone
-        ]);
-
-        try {
-            $whatsappResult = $this->whatsAppService->sendPaymentConfirmation(
-                $client->phone,
-                $datos
-            );
-
-            Log::info('ReservationController::updateStatus - Resultado WhatsApp', [
-                'success' => $whatsappResult
+            Log::info('ReservationController::updateStatus - Email enviado', [
+                'email' => $client->email
             ]);
         } catch (\Exception $e) {
-            Log::error('Error al enviar WhatsApp: ' . $e->getMessage(), [
-                'exception' => get_class($e),
-                'trace' => $e->getTraceAsString()
+            Log::error('Error al enviar email: ' . $e->getMessage(), [
+                'client_id' => $client->id
             ]);
         }
     }

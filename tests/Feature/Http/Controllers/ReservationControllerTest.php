@@ -40,11 +40,6 @@ class ReservationControllerTest extends TestCase
         // Configurar almacenamiento falso
         Storage::fake('s3');
 
-        // Mock del servicio WhatsApp para evitar llamadas reales
-        $this->mock(\App\Services\WhatsAppService::class, function ($mock) {
-            $mock->shouldReceive('sendPaymentConfirmation')->andReturn(true);
-        });
-
         // Crear datos comunes para pruebas
         $this->createTestData();
     }

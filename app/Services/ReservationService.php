@@ -25,14 +25,11 @@ use Illuminate\Support\Facades\Config;
 class ReservationService
 {
     private ReservationRepositoryInterface $reservationRepo;
-    private WhatsAppService $whatsAppService;
 
     public function __construct(
-        ReservationRepositoryInterface $reservationRepo,
-        WhatsAppService $whatsAppService
+        ReservationRepositoryInterface $reservationRepo
     ) {
         $this->reservationRepo = $reservationRepo;
-        $this->whatsAppService = $whatsAppService;
     }
 
     /**
@@ -339,13 +336,9 @@ class ReservationService
             'fecha' => $reservation->trip->date ?? date('Y-m-d'),
         ];
 
-        // Enviar notificaciones por diferentes canales
+        // Enviar notificaciones por email si está habilitado
         if (Config::get('reservations.notifications.email.enabled', true)) {
             $this->sendEmailNotification($reservation->client, $datos);
-        }
-
-        if (Config::get('reservations.notifications.whatsapp.enabled', true)) {
-            $this->sendWhatsAppNotification($reservation->client, $datos);
         }
     }
 
@@ -372,35 +365,6 @@ class ReservationService
             ]);
         } catch (\Exception $e) {
             Log::error('Error al enviar email de confirmación', [
-                'error' => $e->getMessage()
-            ]);
-        }
-    }
-
-    /**
-     * Envía una notificación por WhatsApp
-     *
-     * @param Client $client
-     * @param array $datos
-     * @return void
-     */
-    private function sendWhatsAppNotification(Client $client, array $datos): void
-    {
-        if (empty($client->phone)) {
-            Log::warning('No se puede enviar WhatsApp - Teléfono no disponible', [
-                'client_id' => $client->id
-            ]);
-            return;
-        }
-
-        try {
-            $result = $this->whatsAppService->sendPaymentConfirmation($client->phone, $datos);
-            Log::info('WhatsApp de confirmación: ' . ($result ? 'Enviado' : 'No enviado'), [
-                'client_phone' => $client->phone,
-                'success' => $result
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Error al enviar WhatsApp de confirmación', [
                 'error' => $e->getMessage()
             ]);
         }

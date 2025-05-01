@@ -44,10 +44,6 @@ return [
             'enabled' => true,
             'template' => 'emails.reservation-confirmation',
         ],
-        'whatsapp' => [
-            'enabled' => true,
-            'template_name' => 'reservation_confirmation',
-        ],
     ],
 
     /*
