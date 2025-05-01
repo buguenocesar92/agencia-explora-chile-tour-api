@@ -105,6 +105,18 @@ jobs:
         echo "CACHE_DRIVER=file" >> .env
         echo "SESSION_DRIVER=file" >> .env
         echo "QUEUE_CONNECTION=sync" >> .env
+        echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+        echo "JWT_TTL=60" >> .env
+
+    - name: Prepare storage directories
+      run: |
+        mkdir -p storage/app/public
+        mkdir -p storage/framework/cache/data
+        mkdir -p storage/framework/sessions
+        mkdir -p storage/framework/views
+        mkdir -p storage/logs
+        touch storage/logs/.gitkeep
+        chmod -R 775 storage bootstrap/cache
 
     - name: Optimize for production
       run: |
@@ -126,10 +138,60 @@ jobs:
           **/node_modules/**
           **/vendor/**
           **/tests/**
-          **/storage/logs/**
-          **/storage/framework/cache/**
-          **/storage/framework/sessions/**
-          **/storage/framework/views/**
           .env*
           **.md
           **.yml
+
+    - name: Post deployment setup
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        local-dir: ./
+        server-dir: ${{ secrets.FTP_SERVER_DIR }}/
+        exclude: |
+          **/*
+        include: |
+          maintenance-fix.php
+        protocol: ftp
+      env:
+        maintenance-fix.php: |
+          <?php
+          // Crear archivo para corregir problemas de storage
+          $storagePath = __DIR__ . '/storage';
+          $publicPath = __DIR__ . '/public';
+
+          // Asegurar que los directorios existan
+          if (!file_exists($storagePath . '/app/public')) {
+              mkdir($storagePath . '/app/public', 0775, true);
+          }
+          if (!file_exists($storagePath . '/framework/cache/data')) {
+              mkdir($storagePath . '/framework/cache/data', 0775, true);
+          }
+          if (!file_exists($storagePath . '/framework/sessions')) {
+              mkdir($storagePath . '/framework/sessions', 0775, true);
+          }
+          if (!file_exists($storagePath . '/framework/views')) {
+              mkdir($storagePath . '/framework/views', 0775, true);
+          }
+          if (!file_exists($storagePath . '/logs')) {
+              mkdir($storagePath . '/logs', 0775, true);
+          }
+
+          // Corregir permisos
+          chmod($storagePath . '/app', 0775);
+          chmod($storagePath . '/app/public', 0775);
+          chmod($storagePath . '/framework', 0775);
+          chmod($storagePath . '/framework/cache', 0775);
+          chmod($storagePath . '/framework/cache/data', 0775);
+          chmod($storagePath . '/framework/sessions', 0775);
+          chmod($storagePath . '/framework/views', 0775);
+          chmod($storagePath . '/logs', 0775);
+
+          // Crear enlace simbólico si no existe
+          if (!file_exists($publicPath . '/storage') && function_exists('symlink')) {
+              @symlink($storagePath . '/app/public', $publicPath . '/storage');
+          }
+
+          echo "Mantenimiento completado.";
