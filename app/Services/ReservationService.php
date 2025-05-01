@@ -41,48 +41,16 @@ class ReservationService
     public function createReservation(array $data)
     {
         return DB::transaction(function () use ($data) {
-            // Buscar si ya existe un cliente con este RUT (incluyendo clientes eliminados)
-            $client = Client::withTrashed()->where('rut', $data['client']['rut'])->first();
+            // 1. Procesar el cliente
+            $client = $this->processClient($data['client']);
 
-            if (!$client) {
-                // Antes de crear, verificar si el email ya existe
-                $emailExists = Client::where('email', $data['client']['email'])->exists();
-                if ($emailExists) {
-                    // Si el email ya está en uso, generamos un email único temporal
-                    $data['client']['email'] = $data['client']['email'] . '_' . uniqid();
-                }
-
-                // Si no existe, crear un nuevo cliente
-                $client = Client::create($data['client']);
-            } else if ($client->trashed()) {
-                // Si el cliente existe pero está eliminado, restaurarlo
-                $client->restore();
-                $this->updateClientData($client, $data['client']);
-            } else {
-                // Si ya existe y está activo, actualizar sus datos por si han cambiado
-                $this->updateClientData($client, $data['client']);
-            }
-
-            // Obtener el viaje programado existente usando el ID que envía el wizard
+            // 2. Obtener viaje
             $trip = Trip::findOrFail($data['trip']['trip_date_id']);
 
-            // Procesar el pago:
-            if (empty($data['payment']['payment_date'])) {
-                $data['payment']['payment_date'] = Carbon::now()->toDateString();
-            }
+            // 3. Procesar el pago
+            $payment = $this->processPayment($data['payment']);
 
-            if (
-                isset($data['payment']['receipt']) &&
-                $data['payment']['receipt'] instanceof UploadedFile
-            ) {
-                $path = $data['payment']['receipt']->store('payments', 'public');
-                $data['payment']['receipt'] = $path;
-            }
-
-            // Crear el pago
-            $payment = Payment::create($data['payment']);
-
-            // Preparar los datos para la reserva
+            // 4. Crear la reserva
             $reservationData = [
                 'client_id' => $client->id,
                 'trip_id'   => $trip->id,
@@ -93,6 +61,60 @@ class ReservationService
 
             return $this->reservationRepo->create($reservationData);
         });
+    }
+
+    /**
+     * Procesa los datos del cliente, creando o actualizando según corresponda
+     *
+     * @param array $clientData
+     * @return Client
+     */
+    private function processClient(array $clientData): Client
+    {
+        // Buscar si ya existe un cliente con este RUT (incluyendo clientes eliminados)
+        $client = Client::withTrashed()->where('rut', $clientData['rut'])->first();
+
+        if (!$client) {
+            // Verificar duplicidad de email antes de crear
+            $emailExists = Client::where('email', $clientData['email'])->exists();
+            if ($emailExists) {
+                $clientData['email'] = $clientData['email'] . '_' . uniqid();
+            }
+
+            return Client::create($clientData);
+        }
+
+        // Si existe pero está eliminado, restaurarlo
+        if ($client->trashed()) {
+            $client->restore();
+        }
+
+        // Actualizar datos del cliente existente
+        $this->updateClientData($client, $clientData);
+
+        return $client;
+    }
+
+    /**
+     * Procesa los datos de pago y crea un nuevo registro de pago
+     *
+     * @param array $paymentData
+     * @return Payment
+     */
+    private function processPayment(array $paymentData): Payment
+    {
+        // Establecer fecha de pago si no se proporciona
+        if (empty($paymentData['payment_date'])) {
+            $paymentData['payment_date'] = Carbon::now()->toDateString();
+        }
+
+        // Procesar comprobante si es un archivo
+        if (isset($paymentData['receipt']) && $paymentData['receipt'] instanceof UploadedFile) {
+            $path = $paymentData['receipt']->store('payments', 'public');
+            $paymentData['receipt'] = $path;
+        }
+
+        return Payment::create($paymentData);
     }
 
     /**
@@ -111,7 +133,7 @@ class ReservationService
 
         if ($emailExists) {
             // Si el email ya está en uso, no lo actualizamos
-            unset($clientData['email']); // Eliminar el email de los datos a actualizar
+            unset($clientData['email']);
         }
 
         // Actualizar datos del cliente
@@ -141,7 +163,8 @@ class ReservationService
     public function updateReservationStatus(int $id, string $status)
     {
         // Validar que el estado sea válido según la configuración
-        if (!array_key_exists($status, Config::get('reservations.status', []))) {
+        $validStates = Config::get('reservations.status', []);
+        if (!array_key_exists($status, $validStates)) {
             throw new \InvalidArgumentException("Estado de reserva no válido: {$status}");
         }
 
@@ -177,26 +200,7 @@ class ReservationService
             $reservation = $this->reservationRepo->getById($id);
 
             // Actualizar campos directos de la reserva
-            if (isset($data['status'])) {
-                // Validar que el estado sea válido según la configuración
-                if (!array_key_exists($data['status'], Config::get('reservations.status', []))) {
-                    throw new \InvalidArgumentException("Estado de reserva no válido: {$data['status']}");
-                }
-                $reservation->status = $data['status'];
-            }
-
-            if (isset($data['description'])) {
-                $reservation->description = $data['description'];
-            }
-            if (isset($data['descripcion'])) {
-                $reservation->descripcion = $data['descripcion'];
-            }
-            if (isset($data['date'])) {
-                $reservation->date = $data['date'];
-            }
-
-            // Guardar la reserva
-            $reservation->save();
+            $this->updateReservationData($reservation, $data);
 
             // Actualizar el cliente si se proporciona
             if (isset($data['client']) && is_array($data['client']) && $reservation->client) {
@@ -219,6 +223,39 @@ class ReservationService
     }
 
     /**
+     * Actualiza los campos básicos de una reserva
+     *
+     * @param Reservation $reservation
+     * @param array $data
+     * @return void
+     */
+    private function updateReservationData(Reservation $reservation, array $data): void
+    {
+        if (isset($data['status'])) {
+            // Validar que el estado sea válido
+            $validStates = Config::get('reservations.status', []);
+            if (!array_key_exists($data['status'], $validStates)) {
+                throw new \InvalidArgumentException("Estado de reserva no válido: {$data['status']}");
+            }
+            $reservation->status = $data['status'];
+        }
+
+        if (isset($data['description'])) {
+            $reservation->description = $data['description'];
+        }
+
+        if (isset($data['descripcion'])) {
+            $reservation->descripcion = $data['descripcion'];
+        }
+
+        if (isset($data['date'])) {
+            $reservation->date = $data['date'];
+        }
+
+        $reservation->save();
+    }
+
+    /**
      * Actualiza los datos de un pago
      *
      * @param Payment $payment
@@ -231,7 +268,9 @@ class ReservationService
         if (isset($paymentData['payment_method'])) {
             $validMethods = array_keys(Config::get('reservations.payment_methods', []));
             if (!empty($validMethods) && !in_array($paymentData['payment_method'], $validMethods)) {
-                throw new \InvalidArgumentException("Método de pago no válido: {$paymentData['payment_method']}");
+                throw new \InvalidArgumentException(
+                    "Método de pago no válido: {$paymentData['payment_method']}"
+                );
             }
         }
 
@@ -244,8 +283,6 @@ class ReservationService
 
             // Almacenar nuevo archivo
             $path = $paymentData['receipt']->store('payments', 'public');
-
-            // Actualizar la ruta del archivo
             $paymentData['receipt'] = $path;
         }
 

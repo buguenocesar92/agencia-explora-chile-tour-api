@@ -35,11 +35,10 @@ class ReservationController extends Controller
     public function index(Request $request): JsonResponse
     {
         $filters = $this->extractFiltersFromRequest($request);
-        $reservations = $this->reservationService->listReservations(
-            $request->input('search'),
-            $filters,
-            $request->boolean('with_trashed', false)
-        );
+        $withTrashed = $request->boolean('with_trashed', false);
+        $search = $request->input('search');
+
+        $reservations = $this->reservationService->listReservations($search, $filters, $withTrashed);
 
         return response()->json(['reservations' => $reservations]);
     }
@@ -52,10 +51,12 @@ class ReservationController extends Controller
      */
     public function store(StoreReservationRequest $request): JsonResponse
     {
-        $reservation = $this->reservationService->createReservation($request->validated());
+        $reservation = $this->reservationService->createReservation(
+            $request->validated()
+        );
 
         return response()->json([
-            'message'     => 'Reserva completada correctamente',
+            'message' => 'Reserva completada correctamente',
             'reservation' => $reservation,
         ], 201);
     }
@@ -70,21 +71,17 @@ class ReservationController extends Controller
     public function updateStatus(UpdateReservationStatusRequest $request, int $id): JsonResponse
     {
         $status = $request->input('status', 'paid');
-
-        Log::info('ReservationController::updateStatus - Iniciando actualización', [
-            'id' => $id,
-            'status' => $status
-        ]);
+        Log::info('Actualizando estado de reserva', ['id' => $id, 'status' => $status]);
 
         $reservation = $this->reservationService->updateReservationStatus($id, $status);
 
-        // Si la reserva fue marcada como pagada, enviar notificaciones
+        // Enviar notificaciones si la reserva se marca como pagada
         if ($status === 'paid') {
             $this->reservationService->sendNotificationsForPaidReservation($reservation);
         }
 
         return response()->json([
-            'message'     => 'Estado de reserva actualizado correctamente',
+            'message' => 'Estado de reserva actualizado correctamente',
             'reservation' => $reservation,
         ]);
     }
@@ -112,10 +109,13 @@ class ReservationController extends Controller
      */
     public function update(UpdateReservationRequest $request, int $id): JsonResponse
     {
-        $reservation = $this->reservationService->updateReservation($id, $request->validated());
+        $reservation = $this->reservationService->updateReservation(
+            $id,
+            $request->validated()
+        );
 
         return response()->json([
-            'message'     => 'Reserva actualizada correctamente',
+            'message' => 'Reserva actualizada correctamente',
             'reservation' => $reservation,
         ]);
     }
@@ -129,7 +129,6 @@ class ReservationController extends Controller
     public function destroy(int $id): JsonResponse
     {
         $this->reservationService->deleteReservation($id);
-
         return response()->json(['message' => 'Reserva eliminada correctamente']);
     }
 
@@ -142,7 +141,6 @@ class ReservationController extends Controller
     public function restore(int $id): JsonResponse
     {
         $this->reservationService->restoreReservation($id);
-
         return response()->json(['message' => 'Reserva restaurada correctamente']);
     }
 
@@ -155,7 +153,6 @@ class ReservationController extends Controller
     public function forceDelete(int $id): JsonResponse
     {
         $this->reservationService->forceDeleteReservation($id);
-
         return response()->json(['message' => 'Reserva eliminada permanentemente']);
     }
 
@@ -177,7 +174,7 @@ class ReservationController extends Controller
                 'url' => $fileUrl
             ]);
         } catch (\Exception $e) {
-            Log::error('Error al exportar reservas a Excel: ' . $e->getMessage());
+            Log::error('Error al exportar Excel', ['error' => $e->getMessage()]);
 
             return response()->json([
                 'success' => false,
@@ -195,11 +192,10 @@ class ReservationController extends Controller
     public function markAsPaid(int $id): JsonResponse
     {
         $reservation = $this->reservationService->updateReservationStatus($id, 'paid');
-
         $this->reservationService->sendNotificationsForPaidReservation($reservation);
 
         return response()->json([
-            'message'     => 'Reserva marcada como pagada correctamente',
+            'message' => 'Reserva marcada como pagada correctamente',
             'reservation' => $reservation,
         ]);
     }
@@ -213,7 +209,10 @@ class ReservationController extends Controller
     private function extractFiltersFromRequest(Request $request): array
     {
         $filters = [];
-        $possibleFilters = ['tour_id', 'status', 'date', 'from_date', 'to_date', 'client_id'];
+        $possibleFilters = [
+            'tour_id', 'status', 'date',
+            'from_date', 'to_date', 'client_id'
+        ];
 
         foreach ($possibleFilters as $filter) {
             if ($request->has($filter)) {

@@ -18,11 +18,6 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule)
     {
         // Añadir aquí otras tareas programadas existentes
-
-        // Renovar token de WhatsApp cada 30 días (antes de que caduque el token de 60 días)
-        $schedule->command('whatsapp:renew-token')
-            ->monthlyOn(1, '01:00')
-            ->appendOutputTo(storage_path('logs/whatsapp-token-renewal.log'));
     }
 
     /**

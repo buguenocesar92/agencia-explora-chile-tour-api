@@ -25,7 +25,7 @@ class ReservationControllerTest extends TestCase
     /** @var MockInterface&ReservationService */
     private $reservationService;
 
-    public function setUp(): void
+    protected function setUp(): void
     {
         parent::setUp();
 
@@ -40,16 +40,16 @@ class ReservationControllerTest extends TestCase
         Mail::fake();
     }
 
-    public function tearDown(): void
+    protected function tearDown(): void
     {
         Mockery::close();
         parent::tearDown();
     }
 
     /**
-     * Helper method to call private methods
+     * Invoca un método privado del controlador para pruebas
      */
-    private function invokePrivateMethod($methodName, array $parameters = [])
+    private function invokePrivateMethod(string $methodName, array $parameters = [])
     {
         $reflection = new ReflectionClass(ReservationController::class);
         $method = $reflection->getMethod($methodName);
@@ -57,53 +57,61 @@ class ReservationControllerTest extends TestCase
         return $method->invokeArgs($this->controller, $parameters);
     }
 
-    /**
-     * Test para extractFiltersFromRequest
-     */
-    public function test_extract_filters_from_request()
+    #[\PHPUnit\Framework\Attributes\DataProvider('filterDataProvider')]
+    public function test_extract_filters_from_request(array $requestParams, array $expectedFilters): void
     {
-        // Caso 1: Sin filtros
-        $request = new Request();
-        $filters = $this->invokePrivateMethod('extractFiltersFromRequest', [$request]);
-        $this->assertEmpty($filters);
+        // Arrange
+        $request = new Request($requestParams);
 
-        // Caso 2: Con filtro de tour_id
-        $request = new Request(['tour_id' => 123]);
+        // Act
         $filters = $this->invokePrivateMethod('extractFiltersFromRequest', [$request]);
-        $this->assertEquals(['tour_id' => 123], $filters);
 
-        // Caso 3: Con filtro de status
-        $request = new Request(['status' => 'paid']);
-        $filters = $this->invokePrivateMethod('extractFiltersFromRequest', [$request]);
-        $this->assertEquals(['status' => 'paid'], $filters);
+        // Assert
+        $this->assertEquals($expectedFilters, $filters);
+    }
 
-        // Caso 4: Con filtro de date
-        $date = '2023-01-01';
-        $request = new Request(['date' => $date]);
-        $filters = $this->invokePrivateMethod('extractFiltersFromRequest', [$request]);
-        $this->assertEquals(['date' => $date], $filters);
-
-        // Caso 5: Con múltiples filtros
-        $request = new Request([
-            'tour_id' => 123,
-            'status' => 'paid',
-            'date' => $date,
-            'other_param' => 'value'  // Este no debería ser extraído
-        ]);
-        $filters = $this->invokePrivateMethod('extractFiltersFromRequest', [$request]);
-        $expected = [
-            'tour_id' => 123,
-            'status' => 'paid',
-            'date' => $date
+    /**
+     * Proveedor de datos para test_extract_filters_from_request
+     */
+    public static function filterDataProvider(): array
+    {
+        return [
+            'sin filtros' => [
+                [],  // requestParams
+                []   // expectedFilters
+            ],
+            'solo tour_id' => [
+                ['tour_id' => 123],
+                ['tour_id' => 123]
+            ],
+            'solo status' => [
+                ['status' => 'paid'],
+                ['status' => 'paid']
+            ],
+            'solo date' => [
+                ['date' => '2023-01-01'],
+                ['date' => '2023-01-01']
+            ],
+            'múltiples filtros' => [
+                [
+                    'tour_id' => 123,
+                    'status' => 'paid',
+                    'date' => '2023-01-01',
+                    'other_param' => 'value'  // Parámetro no filtrable
+                ],
+                [
+                    'tour_id' => 123,
+                    'status' => 'paid',
+                    'date' => '2023-01-01'
+                ]
+            ]
         ];
-        $this->assertEquals($expected, $filters);
-        $this->assertArrayNotHasKey('other_param', $filters);
     }
 
     /**
      * Test para sendEmailNotification cuando el cliente tiene email
      */
-    public function test_send_email_notification_sends_email_when_client_has_email()
+    public function test_send_email_notification_sends_email_when_client_has_email(): void
     {
         // Arrange
         $client = new Client();
@@ -128,7 +136,7 @@ class ReservationControllerTest extends TestCase
     /**
      * Test para sendEmailNotification cuando el cliente no tiene email
      */
-    public function test_send_email_notification_does_nothing_when_client_has_no_email()
+    public function test_send_email_notification_does_nothing_when_client_has_no_email(): void
     {
         // Arrange
         $client = new Client();
