@@ -49,8 +49,6 @@ jobs:
         echo "SESSION_DRIVER=array" >> .env
         echo "QUEUE_CONNECTION=sync" >> .env
         echo "MAIL_MAILER=array" >> .env
-        echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
-        echo "JWT_TTL=60" >> .env
 
     - name: Install Composer dependencies
       run: composer install --prefer-dist --no-progress
@@ -64,11 +62,7 @@ jobs:
         php artisan migrate --force
 
     - name: Run tests
-      run: |
-        # Parche para el error de ILIKE en MySQL (reemplazo en todos los archivos relevantes)
-        find app -type f -name "*.php" -exec sed -i 's/ilike/like/g' {} \;
-        find app -type f -name "*.php" -exec sed -i 's/ILIKE/LIKE/g' {} \;
-        php artisan test || (echo "Los tests han fallado pero continuamos porque todos los tests individuales están pasando" && exit 0)
+      run: php artisan test
 
   deploy:
     needs: tests
