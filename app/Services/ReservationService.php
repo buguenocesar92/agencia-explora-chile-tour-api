@@ -91,7 +91,7 @@ class ReservationService
                 'trip_id'   => $trip->id,
                 'payment_id'=> $payment->id,
                 'date'      => Carbon::now()->toDateString(),
-                'status'    => 'pending', // Estado por defecto
+                'status'    => 'not paid', // Estado por defecto
             ];
 
             return $this->reservationRepo->create($reservationData);

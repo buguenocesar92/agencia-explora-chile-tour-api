@@ -11,8 +11,8 @@ return [
     */
     'status' => [
         'paid' => 'Pagado',
-        'pending' => 'Pendiente',
-        'cancelled' => 'Cancelado',
+        'not paid' => 'No Pagado',
+        'pass' => 'Aprobado',
     ],
 
     /*

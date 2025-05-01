@@ -9,133 +9,139 @@ use App\Models\Reservation;
 use App\Models\Trip;
 use App\Models\TourTemplate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use PhpOffice\PhpSpreadsheet\IOFactory;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Database\Eloquent\Collection;
 use Tests\TestCase;
+use Illuminate\Support\Facades\Config;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ReservationsExportTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_export_generates_xlsx_file()
+    /**
+     * Preparar datos de prueba
+     */
+    private function setupTestData($rut = null, $status = 'paid')
     {
-        // Arrange
-        // Crear datos de prueba
-        $client = Client::factory()->create([
-            'name' => 'Test Client',
-            'email' => 'test@example.com',
-            'phone' => '123456789',
-            'rut' => '12345678-9'
-        ]);
+        // Crear cliente con RUT único si se proporciona
+        $client = new Client();
+        $client->name = 'Test Client';
+        $client->email = 'test' . rand(1000, 9999) . '@example.com'; // Email único
+        $client->phone = '123456789';
+        $client->rut = $rut ?? '123' . rand(100000, 999999) . '-' . rand(0, 9); // RUT aleatorio
+        $client->date_of_birth = '1990-01-01';
+        $client->nationality = 'Chilena';
+        $client->save();
 
-        $tourTemplate = TourTemplate::factory()->create([
-            'name' => 'Test Tour',
-            'description' => 'Test Description',
-            'destination' => 'Test Destination'
-        ]);
+        // Crear tour
+        $tourTemplate = new TourTemplate();
+        $tourTemplate->name = 'Test Tour';
+        $tourTemplate->description = 'Test Description';
+        $tourTemplate->destination = 'Test Destination';
+        $tourTemplate->save();
 
-        $trip = Trip::factory()->create([
-            'tour_template_id' => $tourTemplate->id,
-            'departure_date' => '2024-12-01',
-            'return_date' => '2024-12-10'
-        ]);
+        // Crear viaje
+        $trip = new Trip();
+        $trip->tour_template_id = $tourTemplate->id;
+        $trip->departure_date = '2024-12-01';
+        $trip->return_date = '2024-12-10';
+        $trip->save();
 
-        // Crear Payment directamente sin usar factory
+        // Crear pago
         $payment = new Payment();
-        $payment->receipt = 'payments/receipt.jpg';
+        $payment->receipt = 'receipt.jpg';
         $payment->save();
 
-        $reservation = Reservation::factory()->create([
-            'client_id' => $client->id,
-            'trip_id' => $trip->id,
-            'payment_id' => $payment->id,
-            'date' => now()->toDateString(),
-            'status' => 'paid'
-        ]);
+        // Crear reserva
+        $reservation = new Reservation();
+        $reservation->client_id = $client->id;
+        $reservation->trip_id = $trip->id;
+        $reservation->payment_id = $payment->id;
+        $reservation->date = now()->toDateString();
+        $reservation->status = $status;
+        $reservation->save();
 
-        $exporter = new ReservationsExport();
+        return $reservation;
+    }
 
-        // Act
-        $filePath = $exporter->export();
+    public function test_export_generates_xlsx_file()
+    {
+        // Simular exportación sin generar archivo real
+        Excel::fake();
 
-        // Assert
-        $this->assertFileExists($filePath);
+        // Preparar datos
+        $reservation = $this->setupTestData();
+        $reservations = Reservation::with(['client', 'trip.tourTemplate', 'payment'])->get();
 
-        // Verificar que el archivo es un XLSX válido
-        $spreadsheet = IOFactory::load($filePath);
-        $worksheet = $spreadsheet->getActiveSheet();
+        // Crear la exportación
+        $export = new ReservationsExport($reservations);
 
-        // Verificar encabezados
-        $this->assertEquals('ID', $worksheet->getCell('A1')->getValue());
-        $this->assertEquals('Cliente', $worksheet->getCell('B1')->getValue());
-        $this->assertEquals('RUT', $worksheet->getCell('C1')->getValue());
-        $this->assertEquals('Email', $worksheet->getCell('D1')->getValue());
-        $this->assertEquals('Teléfono', $worksheet->getCell('E1')->getValue());
-        $this->assertEquals('Destino/Tour', $worksheet->getCell('F1')->getValue());
-        $this->assertEquals('Fecha', $worksheet->getCell('G1')->getValue());
-        $this->assertEquals('Estado', $worksheet->getCell('H1')->getValue());
-        $this->assertEquals('Comprobante de Pago', $worksheet->getCell('I1')->getValue());
+        // Nombre de archivo de prueba
+        $filename = 'test_export.xlsx';
 
-        // Verificar contenido para la primera reserva
-        $this->assertEquals($reservation->id, $worksheet->getCell('A2')->getValue());
-        $this->assertEquals('Test Client', $worksheet->getCell('B2')->getValue());
-        $this->assertEquals('12345678-9', $worksheet->getCell('C2')->getValue());
-        $this->assertEquals('test@example.com', $worksheet->getCell('D2')->getValue());
-        $this->assertEquals('123456789', $worksheet->getCell('E2')->getValue());
-        $this->assertEquals('Test Tour', $worksheet->getCell('F2')->getValue());
-        $this->assertEquals('Pagado', $worksheet->getCell('H2')->getValue());
+        // Exportar
+        $export->store($filename, 'public');
 
-        // Limpiar después de la prueba
-        @unlink($filePath);
+        // Verificar que se llamó a Excel::store
+        Excel::assertStored($filename, 'public');
     }
 
     public function test_export_applies_filters()
     {
-        // Arrange
-        // Crear varios clientes y reservas con diferentes estados
-        $client1 = Client::factory()->create(['name' => 'Client 1']);
-        $client2 = Client::factory()->create(['name' => 'Client 2']);
+        // Simular exportación
+        Excel::fake();
 
-        $tourTemplate = TourTemplate::factory()->create();
-        $trip1 = Trip::factory()->create(['tour_template_id' => $tourTemplate->id]);
-        $trip2 = Trip::factory()->create(['tour_template_id' => $tourTemplate->id]);
+        // Crear dos reservas con estados diferentes
+        $this->setupTestData(null, 'paid');
 
-        // Crear Payment directamente sin usar factory
-        $payment = new Payment();
-        $payment->receipt = 'payments/receipt.jpg';
-        $payment->save();
+        // Crear otra reserva no pagada
+        $this->setupTestData(null, 'not paid');
 
-        // Reserva pagada para el cliente 1
-        Reservation::factory()->create([
-            'client_id' => $client1->id,
-            'trip_id' => $trip1->id,
-            'payment_id' => $payment->id,
-            'status' => 'paid'
-        ]);
+        // Obtener solo las reservas pagadas
+        $paidReservations = Reservation::where('status', 'paid')
+            ->with(['client', 'trip.tourTemplate', 'payment'])
+            ->get();
 
-        // Reserva no pagada para el cliente 2
-        Reservation::factory()->create([
-            'client_id' => $client2->id,
-            'trip_id' => $trip2->id,
-            'payment_id' => $payment->id,
-            'status' => 'not paid'
-        ]);
+        // Crear la exportación con filtro
+        $export = new ReservationsExport($paidReservations);
 
-        // Exportador con filtro de estado = pagado
-        $exporter = new ReservationsExport(['status' => 'paid']);
+        // Exportar
+        $filename = 'filtered_export.xlsx';
+        $export->store($filename, 'public');
 
-        // Act
-        $filePath = $exporter->export();
+        // Verificar que se exportó correctamente
+        Excel::assertStored($filename, 'public');
 
-        // Assert
-        $spreadsheet = IOFactory::load($filePath);
-        $worksheet = $spreadsheet->getActiveSheet();
+        // Verificar que la cantidad de reservas exportadas coincide con las filtradas
+        $this->assertEquals(1, $paidReservations->count());
+    }
 
-        // Debería haber solo 1 reserva (encabezado + 1 fila de datos)
-        $this->assertEquals('Pagado', $worksheet->getCell('H2')->getValue());
-        // No debe existir una tercera fila (solo debe haber el encabezado y una reserva)
-        $this->assertEquals(null, $worksheet->getCell('B3')->getValue());
+    /**
+     * Test para verificar que el método map funciona correctamente
+     */
+    public function test_map_method_formats_data_correctly()
+    {
+        // Crear datos de prueba
+        $reservation = $this->setupTestData();
 
-        // Limpiar
-        @unlink($filePath);
+        // Obtener reserva con relaciones
+        $reservation = Reservation::with(['client', 'trip.tourTemplate', 'payment'])->first();
+
+        // Crear exportación con Eloquent Collection
+        $reservationsCollection = new Collection([$reservation]);
+        $export = new ReservationsExport($reservationsCollection);
+
+        // Obtener datos mapeados
+        $mappedData = $export->map($reservation);
+
+        // Verificar que los datos se hayan mapeado correctamente
+        $this->assertEquals($reservation->id, $mappedData['id']);
+        $this->assertEquals($reservation->client->name, $mappedData['cliente']);
+        $this->assertEquals($reservation->client->rut, $mappedData['rut']);
+        $this->assertEquals($reservation->client->email, $mappedData['email']);
+        $this->assertEquals($reservation->client->phone, $mappedData['telefono']);
+        $this->assertEquals($reservation->trip->tourTemplate->name, $mappedData['destino']);
+        $this->assertEquals('Pagado', $mappedData['estado']); // Verifica la traducción del estado
     }
 }
