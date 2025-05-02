@@ -154,6 +154,7 @@ jobs:
           **/*
         include: |
           maintenance-fix.php
+          bootstrap/app-fix.php
         protocol: ftp
       env:
         maintenance-fix.php: |
@@ -161,6 +162,7 @@ jobs:
           // Crear archivo para corregir problemas de storage
           $storagePath = __DIR__ . '/storage';
           $publicPath = __DIR__ . '/public';
+          $bootstrapPath = __DIR__ . '/bootstrap';
 
           // Asegurar que los directorios existan
           if (!file_exists($storagePath . '/app/public')) {
@@ -194,4 +196,29 @@ jobs:
               @symlink($storagePath . '/app/public', $publicPath . '/storage');
           }
 
-          echo "Mantenimiento completado.";
+          // Limpiar todos los archivos de caché para regenerar configuración
+          echo "Limpiando caché...\n";
+          $cachePath = $bootstrapPath . '/cache';
+          if (is_dir($cachePath)) {
+              $files = glob($cachePath . '/*');
+              foreach ($files as $file) {
+                  if (is_file($file)) {
+                      unlink($file);
+                      echo "Eliminado: " . basename($file) . "\n";
+                  }
+              }
+          }
+
+          // Forzar regeneración del archivo .env.php para la nueva configuración
+          touch(__DIR__ . '/.env');
+
+          // Crear un archivo vacío en logs para asegurar permisos
+          $logFile = $storagePath . '/logs/laravel.log';
+          if (!file_exists($logFile)) {
+              touch($logFile);
+              chmod($logFile, 0666); // Permisos de escritura para todos
+          } else {
+              chmod($logFile, 0666);
+          }
+
+          echo "Mantenimiento completado. La caché ha sido limpiada y los permisos corregidos.";
