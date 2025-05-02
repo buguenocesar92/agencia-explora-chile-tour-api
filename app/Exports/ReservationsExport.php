@@ -88,9 +88,7 @@ class ReservationsExport implements FromCollection, WithHeadings, WithMapping, S
             'estado' => $status,
             'metodo_pago' => $reservation->payment->payment_method ?? 'N/A',
             'monto' => $reservation->payment->amount ?? 'N/A',
-            'comprobante' => $reservation->payment->receipt
-                ? url('storage/' . $reservation->payment->receipt)
-                : 'No disponible'
+            'comprobante' => $reservation->payment->receipt_url ?? 'No disponible'
         ];
     }
 
