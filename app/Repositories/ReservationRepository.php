@@ -77,9 +77,9 @@ class ReservationRepository implements ReservationRepositoryInterface
                 // Limpiar el formato del RUT para comparación (quitar puntos y guiones)
                 $cleanSearch = preg_replace('/[.-]/', '', $search);
 
-                $q->where('name', 'ilike', "%$search%")
-                  // Buscar coincidencia exacta de RUT limpio
-                  ->orWhereRaw("REPLACE(REPLACE(rut, '.', ''), '-', '') ILIKE ?", ["%$cleanSearch%"]);
+                $q->where('name', 'like', "%$search%")
+                  // Buscar coincidencia exacta de RUT limpio con LOWER() para hacerlo case-insensitive en MySQL
+                  ->orWhereRaw("LOWER(REPLACE(REPLACE(rut, '.', ''), '-', '')) LIKE LOWER(?)", ["%$cleanSearch%"]);
             });
         })
         ->when(isset($filters['tour_id']), function ($query) use ($filters) {

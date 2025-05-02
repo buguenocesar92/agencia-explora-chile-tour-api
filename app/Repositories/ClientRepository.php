@@ -31,10 +31,10 @@ class ClientRepository implements ClientRepositoryInterface
             $cleanSearch = preg_replace('/[.-]/', '', $search);
 
             $query->where(function ($q) use ($search, $cleanSearch) {
-                $q->where('name', 'ilike', "%$search%")
-                  ->orWhere('email', 'ilike', "%$search%")
-                  // Buscar en RUT limpio
-                  ->orWhereRaw("REPLACE(REPLACE(rut, '.', ''), '-', '') ILIKE ?", ["%$cleanSearch%"]);
+                $q->where('name', 'like', "%$search%")
+                  ->orWhere('email', 'like', "%$search%")
+                  // Buscar en RUT limpio con LOWER() para hacerlo case-insensitive en MySQL
+                  ->orWhereRaw("LOWER(REPLACE(REPLACE(rut, '.', ''), '-', '')) LIKE LOWER(?)", ["%$cleanSearch%"]);
             });
         }
 
