@@ -138,11 +138,16 @@ jobs:
           **/node_modules/**
           **/vendor/**
           **/tests/**
+          **/storage/logs/**
+          **/storage/framework/cache/**
+          **/storage/framework/sessions/**
+          **/storage/framework/views/**
+          **/bootstrap/cache/**
           .env*
           **.md
           **.yml
 
-    - name: Deploy config fixes and critical files
+    - name: Deploy simple fix script
       uses: SamKirkland/FTP-Deploy-Action@v4.3.4
       with:
         server: ${{ secrets.FTP_SERVER }}
@@ -153,180 +158,58 @@ jobs:
         exclude: |
           **/*
         include: |
-          fix-logs.php
-          config/logging.php
+          reset-cache.php
         protocol: ftp
       env:
-        config/logging.php: |
+        reset-cache.php: |
           <?php
+          // Script simple para crear directorios necesarios y limpiar caché
 
-          use Monolog\Handler\NullHandler;
-          use Monolog\Handler\StreamHandler;
-          use Monolog\Handler\SyslogUdpHandler;
+          echo "Iniciando script de mantenimiento...\n";
 
-          return [
-              'default' => env('LOG_CHANNEL', 'stack'),
-              'deprecations' => [
-                  'channel' => env('LOG_DEPRECATIONS_CHANNEL', 'null'),
-                  'trace' => false,
-              ],
-              'channels' => [
-                  'stack' => [
-                      'driver' => 'stack',
-                      'channels' => ['single'],
-                      'ignore_exceptions' => false,
-                  ],
-                  'single' => [
-                      'driver' => 'single',
-                      'path' => './storage/logs/laravel.log',
-                      'level' => env('LOG_LEVEL', 'debug'),
-                  ],
-                  'daily' => [
-                      'driver' => 'daily',
-                      'path' => './storage/logs/laravel.log',
-                      'level' => env('LOG_LEVEL', 'debug'),
-                      'days' => 14,
-                  ],
-                  'slack' => [
-                      'driver' => 'slack',
-                      'url' => env('LOG_SLACK_WEBHOOK_URL'),
-                      'username' => 'Laravel Log',
-                      'emoji' => ':boom:',
-                      'level' => env('LOG_LEVEL', 'critical'),
-                  ],
-                  'papertrail' => [
-                      'driver' => 'monolog',
-                      'level' => env('LOG_LEVEL', 'debug'),
-                      'handler' => env('LOG_PAPERTRAIL_HANDLER', SyslogUdpHandler::class),
-                      'handler_with' => [
-                          'host' => env('PAPERTRAIL_URL'),
-                          'port' => env('PAPERTRAIL_PORT'),
-                          'connectionString' => 'tls://'.env('PAPERTRAIL_URL').':'.env('PAPERTRAIL_PORT'),
-                      ],
-                  ],
-                  'stderr' => [
-                      'driver' => 'monolog',
-                      'level' => env('LOG_LEVEL', 'debug'),
-                      'handler' => StreamHandler::class,
-                      'formatter' => env('LOG_STDERR_FORMATTER'),
-                      'with' => [
-                          'stream' => 'php://stderr',
-                      ],
-                  ],
-                  'syslog' => [
-                      'driver' => 'syslog',
-                      'level' => env('LOG_LEVEL', 'debug'),
-                  ],
-                  'errorlog' => [
-                      'driver' => 'errorlog',
-                      'level' => env('LOG_LEVEL', 'debug'),
-                  ],
-                  'null' => [
-                      'driver' => 'monolog',
-                      'handler' => NullHandler::class,
-                  ],
-                  'emergency' => [
-                      'path' => './storage/logs/laravel.log',
-                  ],
-              ],
+          // Crear directorios necesarios
+          $dirs = [
+            __DIR__ . '/storage/app/public',
+            __DIR__ . '/storage/framework/cache',
+            __DIR__ . '/storage/framework/sessions',
+            __DIR__ . '/storage/framework/views',
+            __DIR__ . '/storage/logs',
+            __DIR__ . '/bootstrap/cache'
           ];
 
-        bootstrap-patch.php: |
-          <?php
-          // Parche para evitar problemas con las rutas hardcodeadas en bibliotecas Laravel y Monolog
-
-          class BootstrapPatcher {
-              public static function apply() {
-                  // Sobreescribir el método storage_path() solo en el entorno de producción
-                  if (!function_exists('original_storage_path')) {
-                      function original_storage_path($path = '') {
-                          return app()->storagePath().($path ? DIRECTORY_SEPARATOR.$path : $path);
-                      }
-
-                      function storage_path($path = '') {
-                          // Usar rutas relativas en lugar de absolutas
-                          $basePath = './storage';
-                          return $basePath.($path ? DIRECTORY_SEPARATOR.$path : $path);
-                      }
-                  }
-              }
+          foreach ($dirs as $dir) {
+            if (!file_exists($dir)) {
+              echo "Creando directorio: $dir\n";
+              mkdir($dir, 0755, true);
+            }
           }
 
-          // Aplicar el parche
-          BootstrapPatcher::apply();
-
-          // Registrar este archivo como un archivo de bootstrapping adicional
-          if (file_exists(__DIR__.'/bootstrap/app.php')) {
-              $app = require_once __DIR__.'/bootstrap/app.php';
-              return $app;
+          // Configurar permisos
+          echo "Estableciendo permisos...\n";
+          foreach ($dirs as $dir) {
+            chmod($dir, 0755);
           }
 
-        fix-logs.php: |
-          <?php
-          // Script para corregir los problemas de rutas y permisos
+          // Crear archivo de logs vacío
+          touch(__DIR__ . '/storage/logs/laravel.log');
+          chmod(__DIR__ . '/storage/logs/laravel.log', 0664);
 
-          // Este script soluciona el problema de rutas hardcodeadas en las bibliotecas
-
-          // Directorios que necesitamos crear/asegurar
-          $paths = [
-              __DIR__ . '/storage/app/public',
-              __DIR__ . '/storage/framework/cache/data',
-              __DIR__ . '/storage/framework/sessions',
-              __DIR__ . '/storage/framework/views',
-              __DIR__ . '/storage/logs',
-              __DIR__ . '/bootstrap/cache',
-          ];
-
-          // Crear los directorios si no existen
-          foreach ($paths as $path) {
-              if (!file_exists($path)) {
-                  echo "Creando directorio: {$path}\n";
-                  mkdir($path, 0755, true);
-              }
-              chmod($path, 0755);
-          }
-
-          // Limpiar la caché
+          // Limpiar caché
+          echo "Limpiando caché...\n";
           $cacheFiles = glob(__DIR__ . '/bootstrap/cache/*.php');
-          foreach ($cacheFiles as $file) {
-              echo "Eliminando archivo de caché: {$file}\n";
-              @unlink($file);
+          if ($cacheFiles) {
+            foreach ($cacheFiles as $file) {
+              unlink($file);
+              echo "Eliminado: " . basename($file) . "\n";
+            }
+          } else {
+            echo "No se encontraron archivos de caché para eliminar.\n";
           }
 
-          // Crear un archivo de logs vacío con permisos adecuados
-          $logFile = __DIR__ . '/storage/logs/laravel.log';
-          if (!file_exists($logFile)) {
-              touch($logFile);
-          }
-          chmod($logFile, 0664);
+          echo "Mantenimiento completado correctamente.\n";
+          echo "Por favor, acceda a su aplicación ahora.\n";
 
-          // Crear el parche para bootstrap
-          $bootstrapPatchContent = file_get_contents(__DIR__ . '/bootstrap-patch.php');
-          file_put_contents(__DIR__ . '/bootstrap/bootstrap-patch.php', $bootstrapPatchContent);
-
-          // Modificar el archivo index.php para incluir nuestro parche
-          $indexFile = __DIR__ . '/public/index.php';
-          if (file_exists($indexFile)) {
-              $indexContent = file_get_contents($indexFile);
-
-              // Si el parche aún no está aplicado
-              if (strpos($indexContent, 'bootstrap-patch.php') === false) {
-                  $newContent = str_replace(
-                      "require __DIR__.'/../bootstrap/app.php';",
-                      "// Cargar el parche de bootstrap antes que la aplicación\nrequire __DIR__.'/../bootstrap/bootstrap-patch.php';",
-                      $indexContent
-                  );
-                  file_put_contents($indexFile, $newContent);
-                  echo "Aplicado parche en index.php para rutas relativas\n";
-              } else {
-                  echo "El parche ya está aplicado en index.php\n";
-              }
-          }
-
-          echo "Finalizado el proceso de corrección de permisos y rutas.\n";
-          echo "La aplicación ahora debería estar usando rutas relativas para los logs.\n";
-
-    - name: Post deployment manual steps
+    - name: Post deployment instructions
       uses: SamKirkland/FTP-Deploy-Action@v4.3.4
       with:
         server: ${{ secrets.FTP_SERVER }}
@@ -337,40 +220,16 @@ jobs:
         exclude: |
           **/*
         include: |
-          README-DEPLOYMENT.md
+          DEPLOY-README.md
         protocol: ftp
       env:
-        README-DEPLOYMENT.md: |
+        DEPLOY-README.md: |
           # Instrucciones Post-Despliegue
 
-          Después de cada despliegue, necesitas ejecutar los siguientes pasos para evitar errores:
-
-          ## 1. Ejecutar el script de corrección de rutas y permisos
+          Después de cada despliegue, ejecute este comando:
 
           ```
-          php fix-logs.php
+          php reset-cache.php
           ```
 
-          ## 2. Limpiar la caché de Laravel
-
-          Si aún tienes problemas después de ejecutar el script, limpia manualmente la caché con:
-
-          ```
-          rm -rf bootstrap/cache/*
-          ```
-
-          ## 3. Comprobar permisos
-
-          Asegúrate de que los siguientes directorios son escribibles:
-
-          ```
-          chmod -R 755 storage bootstrap/cache
-          ```
-
-          ## 4. Si persisten los problemas, ajusta la configuración de logs
-
-          Edita `config/logging.php` y cambia las rutas absolutas por relativas:
-
-          ```php
-          'path' => 'storage/logs/laravel.log',
-          ```
+          Esto creará los directorios necesarios, establecerá los permisos correctos y limpiará la caché.
