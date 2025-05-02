@@ -142,7 +142,7 @@ jobs:
           **.md
           **.yml
 
-    - name: Post deployment setup
+    - name: Deploy config fixes and critical files
       uses: SamKirkland/FTP-Deploy-Action@v4.3.4
       with:
         server: ${{ secrets.FTP_SERVER }}
@@ -153,72 +153,195 @@ jobs:
         exclude: |
           **/*
         include: |
-          maintenance-fix.php
-          bootstrap/app-fix.php
+          fix-logs.php
+          config/logging.php
         protocol: ftp
       env:
-        maintenance-fix.php: |
+        config/logging.php: |
           <?php
-          // Crear archivo para corregir problemas de storage
-          $storagePath = __DIR__ . '/storage';
-          $publicPath = __DIR__ . '/public';
-          $bootstrapPath = __DIR__ . '/bootstrap';
 
-          // Asegurar que los directorios existan
-          if (!file_exists($storagePath . '/app/public')) {
-              mkdir($storagePath . '/app/public', 0775, true);
-          }
-          if (!file_exists($storagePath . '/framework/cache/data')) {
-              mkdir($storagePath . '/framework/cache/data', 0775, true);
-          }
-          if (!file_exists($storagePath . '/framework/sessions')) {
-              mkdir($storagePath . '/framework/sessions', 0775, true);
-          }
-          if (!file_exists($storagePath . '/framework/views')) {
-              mkdir($storagePath . '/framework/views', 0775, true);
-          }
-          if (!file_exists($storagePath . '/logs')) {
-              mkdir($storagePath . '/logs', 0775, true);
-          }
+          use Monolog\Handler\NullHandler;
+          use Monolog\Handler\StreamHandler;
+          use Monolog\Handler\SyslogUdpHandler;
 
-          // Corregir permisos
-          chmod($storagePath . '/app', 0775);
-          chmod($storagePath . '/app/public', 0775);
-          chmod($storagePath . '/framework', 0775);
-          chmod($storagePath . '/framework/cache', 0775);
-          chmod($storagePath . '/framework/cache/data', 0775);
-          chmod($storagePath . '/framework/sessions', 0775);
-          chmod($storagePath . '/framework/views', 0775);
-          chmod($storagePath . '/logs', 0775);
+          return [
+              'default' => env('LOG_CHANNEL', 'stack'),
+              'deprecations' => [
+                  'channel' => env('LOG_DEPRECATIONS_CHANNEL', 'null'),
+                  'trace' => false,
+              ],
+              'channels' => [
+                  'stack' => [
+                      'driver' => 'stack',
+                      'channels' => ['single'],
+                      'ignore_exceptions' => false,
+                  ],
+                  'single' => [
+                      'driver' => 'single',
+                      'path' => storage_path('logs/laravel.log'),
+                      'level' => env('LOG_LEVEL', 'debug'),
+                  ],
+                  'daily' => [
+                      'driver' => 'daily',
+                      'path' => storage_path('logs/laravel.log'),
+                      'level' => env('LOG_LEVEL', 'debug'),
+                      'days' => 14,
+                  ],
+                  'slack' => [
+                      'driver' => 'slack',
+                      'url' => env('LOG_SLACK_WEBHOOK_URL'),
+                      'username' => 'Laravel Log',
+                      'emoji' => ':boom:',
+                      'level' => env('LOG_LEVEL', 'critical'),
+                  ],
+                  'papertrail' => [
+                      'driver' => 'monolog',
+                      'level' => env('LOG_LEVEL', 'debug'),
+                      'handler' => env('LOG_PAPERTRAIL_HANDLER', SyslogUdpHandler::class),
+                      'handler_with' => [
+                          'host' => env('PAPERTRAIL_URL'),
+                          'port' => env('PAPERTRAIL_PORT'),
+                          'connectionString' => 'tls://'.env('PAPERTRAIL_URL').':'.env('PAPERTRAIL_PORT'),
+                      ],
+                  ],
+                  'stderr' => [
+                      'driver' => 'monolog',
+                      'level' => env('LOG_LEVEL', 'debug'),
+                      'handler' => StreamHandler::class,
+                      'formatter' => env('LOG_STDERR_FORMATTER'),
+                      'with' => [
+                          'stream' => 'php://stderr',
+                      ],
+                  ],
+                  'syslog' => [
+                      'driver' => 'syslog',
+                      'level' => env('LOG_LEVEL', 'debug'),
+                  ],
+                  'errorlog' => [
+                      'driver' => 'errorlog',
+                      'level' => env('LOG_LEVEL', 'debug'),
+                  ],
+                  'null' => [
+                      'driver' => 'monolog',
+                      'handler' => NullHandler::class,
+                  ],
+                  'emergency' => [
+                      'path' => storage_path('logs/laravel.log'),
+                  ],
+              ],
+          ];
 
-          // Crear enlace simbólico si no existe
-          if (!file_exists($publicPath . '/storage') && function_exists('symlink')) {
-              @symlink($storagePath . '/app/public', $publicPath . '/storage');
-          }
+        fix-logs.php: |
+          <?php
+          // Script para corregir los problemas de rutas y permisos
 
-          // Limpiar todos los archivos de caché para regenerar configuración
-          echo "Limpiando caché...\n";
-          $cachePath = $bootstrapPath . '/cache';
-          if (is_dir($cachePath)) {
-              $files = glob($cachePath . '/*');
-              foreach ($files as $file) {
-                  if (is_file($file)) {
-                      unlink($file);
-                      echo "Eliminado: " . basename($file) . "\n";
-                  }
+          // Directorios que necesitamos crear/asegurar
+          $paths = [
+              __DIR__ . '/storage/app/public',
+              __DIR__ . '/storage/framework/cache/data',
+              __DIR__ . '/storage/framework/sessions',
+              __DIR__ . '/storage/framework/views',
+              __DIR__ . '/storage/logs',
+              __DIR__ . '/bootstrap/cache',
+          ];
+
+          // Crear los directorios si no existen
+          foreach ($paths as $path) {
+              if (!file_exists($path)) {
+                  echo "Creando directorio: {$path}\\n";
+                  mkdir($path, 0755, true);
               }
+              chmod($path, 0755);
           }
 
-          // Forzar regeneración del archivo .env.php para la nueva configuración
-          touch(__DIR__ . '/.env');
+          // Limpiar la caché
+          $cacheFiles = glob(__DIR__ . '/bootstrap/cache/*.php');
+          foreach ($cacheFiles as $file) {
+              echo "Eliminando archivo de caché: {$file}\\n";
+              @unlink($file);
+          }
 
-          // Crear un archivo vacío en logs para asegurar permisos
-          $logFile = $storagePath . '/logs/laravel.log';
+          // Crear .htaccess para proteger storage
+          $htaccess = <<<EOD
+          <IfModule mod_rewrite.c>
+              <IfModule mod_negotiation.c>
+                  Options -MultiViews -Indexes
+              </IfModule>
+
+              RewriteEngine On
+
+              # Handle Authorization Header
+              RewriteCond %{HTTP:Authorization} .
+              RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+              # Deny access to these folders
+              RewriteRule ^(bootstrap|storage)/.*$ / [F,L]
+          </IfModule>
+          EOD;
+
+          file_put_contents(__DIR__ . '/.htaccess', $htaccess);
+
+          // Crear un archivo de logs vacío con permisos adecuados
+          $logFile = __DIR__ . '/storage/logs/laravel.log';
           if (!file_exists($logFile)) {
               touch($logFile);
-              chmod($logFile, 0666); // Permisos de escritura para todos
-          } else {
-              chmod($logFile, 0666);
+          }
+          chmod($logFile, 0664);
+
+          echo "Finalizado el proceso de corrección de permisos y rutas.\\n";
+          echo "Por favor, ejecute este script después de cada despliegue o cuando tenga problemas con los logs.\\n";
+
+          // Crear un archivo .env completo si es necesario
+          if (!file_exists(__DIR__ . '/.env')) {
+              copy(__DIR__ . '/storage/.env.example', __DIR__ . '/.env');
+              echo "Se ha creado un archivo .env de ejemplo. Por favor, edítelo con la configuración correcta.\\n";
           }
 
-          echo "Mantenimiento completado. La caché ha sido limpiada y los permisos corregidos.";
+    - name: Post deployment manual steps
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        local-dir: ./
+        server-dir: ${{ secrets.FTP_SERVER_DIR }}/
+        exclude: |
+          **/*
+        include: |
+          README-DEPLOYMENT.md
+        protocol: ftp
+      env:
+        README-DEPLOYMENT.md: |
+          # Instrucciones Post-Despliegue
+
+          Después de cada despliegue, necesitas ejecutar los siguientes pasos para evitar errores:
+
+          ## 1. Ejecutar el script de corrección de rutas y permisos
+
+          ```
+          php fix-logs.php
+          ```
+
+          ## 2. Limpiar la caché de Laravel
+
+          Si aún tienes problemas después de ejecutar el script, limpia manualmente la caché con:
+
+          ```
+          rm -rf bootstrap/cache/*
+          ```
+
+          ## 3. Comprobar permisos
+
+          Asegúrate de que los siguientes directorios son escribibles:
+
+          ```
+          chmod -R 755 storage bootstrap/cache
+          ```
+
+          ## 4. Si persisten los problemas, ajusta la configuración de logs
+
+          Edita `config/logging.php` y cambia las rutas absolutas por relativas:
+
+          ```php
+          'path' => 'storage/logs/laravel.log',
+          ```
